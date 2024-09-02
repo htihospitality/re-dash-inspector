@@ -1,0 +1,40 @@
+{:paths ["script"]
+ :deps  {}
+ :tasks
+ {compile {:doc  "Compile app"
+           :task (shell "clojure -M:cljd compile")}
+
+  build {:doc      "Builds the deployable assets"
+         :requires ([clojure.string :as s]
+                    [babashka.fs :as fs]
+                    [babashka.cli :as cli])
+         :task     (let [{:keys [artifact]
+                          :or   {artifact "web"}
+                          :as   args} (cli/parse-opts *command-line-args*)]
+                     (shell (s/join " "
+                                    (flatten [(str "fvm flutter build " artifact)]))))
+         :depends  [compile]}
+
+  build-copy {:doc     "Build and copy assets to extension folder"
+              :task    (shell "fvm dart run devtools_extensions build_and_copy --source=. --dest=extension/devtools")
+              :depends [build]}
+
+  validate {:doc  "Validate the extension build output"
+            :task (shell "fvm dart run devtools_extensions validate --package=.")}
+
+  publish-dry-run {:doc  "Validate the pub package for publish"
+                   :task (shell "fvm dart pub publish --dry-run")}
+
+  publish {:doc  "Publish to pub.dev"
+           :task (shell "fvm dart pub publish")}
+
+  run {:doc      "Runs in simulator"
+       :requires ([clojure.string :as s]
+                  [babashka.fs :as fs]
+                  [babashka.cli :as cli])
+       :task     (let [{:keys [artifact]
+                        :or   {artifact "web"}
+                        :as   args} (cli/parse-opts *command-line-args*)]
+                   (clojure (s/join " "
+                                    (flatten ["-M:cljd flutter -d chrome"
+                                              "--dart-define=use_simulated_environment=true"]))))}}}
