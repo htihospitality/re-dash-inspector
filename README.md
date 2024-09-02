@@ -1,6 +1,6 @@
 # re-dash-inspector
 
-A Flutter DevTools extension for re-dash
+A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-dash)
 
 # Features
 
