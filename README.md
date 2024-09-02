@@ -15,7 +15,21 @@ A Flutter DevTools extension for re-dash
 
 # Usage
 
-TBC
+Add `re_dash_inspector` to your `dev_dependencies` in `pubspec.yaml`
+
+```clojure
+dev_dependencies:
+  re_dash_inspector: ^0.0.1
+```
+
+then register the `debug` re-dash interceptor targeting dev-tools either in selected event handlers or globally in `main` like
+
+```clojure
+(rd/reg-global-interceptor
+    (rd/debug {:target :target/dev-tools}))
+```
+
+See [Debugging](https://github.com/htihospitality/re-dash/blob/main/doc/02-debugging.md) for more options using the `debug` interceptor.
 
 # Performance
 
