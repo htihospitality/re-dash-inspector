@@ -8,6 +8,10 @@ A Flutter DevTools extension for re-dash
 - Free text search anything
 - Drill down into nested map values
 
+# Demo
+
+[re-dash-inspector.webm](https://github.com/user-attachments/assets/e6864f98-e97f-4d9a-8624-ac06c71c9cef)
+
 # Prerequisites
 
 - The contents of the app db need to be serializable to/from EDN using ClojureDart's `pr-str` and `cljd.reader/read-string`
