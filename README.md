@@ -14,6 +14,7 @@ A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-
 
 # Prerequisites
 
+-[re-dash](https://github.com/htihospitality/re-dash) v1.1.0 minimum 
 - The contents of the app db need to be serializable to/from EDN using ClojureDart's `pr-str` and `cljd.reader/read-string`
 - The data in the inspector will only update if the inspector is currently open and visible on the screen while the database is mutated. If not, new changes will not reflect until a new event mutates the database and the inspector window is open at the time.
 
