@@ -31,14 +31,17 @@
   "The data for the selected search / filter"
   (f/widget
 
-    :get {media-query m/MediaQuery
-          state       :state}
+    :get {state :state}
 
     :watch [{:keys [db selected-path search-text]} state
 
-            color-scheme (atom (condp = (.-platformBrightness ^m/MediaQueryData media-query)
-                                 m/Brightness.dark  ui/darkColorScheme
-                                 m/Brightness.light ui/lightColorScheme))
+            dark-mode? (some-> ^ext/ExtensionManager
+                               (get utils/globals ext/ExtensionManager)
+                               .-darkThemeEnabled)
+
+            color-scheme (atom (if dark-mode?
+                                 ui/darkColorScheme
+                                 ui/lightColorScheme))
 
             ;; Narrow down the db map to only what's been selected
             ;; (eg. when the user selected a nested map value from the ui)
@@ -139,6 +142,22 @@
   (ui/AreaPaneHeader
     .title (m/Text "re-dash Inspector")))
 
+(def footer
+  (f/widget
+    :context ctx
+    ui/RoundedOutlinedBorder
+    (m/Padding .padding (m/EdgeInsets.all 2))
+    (m/Row
+      .mainAxisAlignment m/MainAxisAlignment.center
+      .children
+      [(m/Text "Find re-dash useful? Consider donating via ")
+       (m/Text.rich
+         (ui/LinkTextSpan
+           .link (ui/Link
+                   .display "Github Sponsors"
+                   .url "https://github.com/sponsors/htihospitality")
+           .context ctx))])))
+
 
 (defn main
   []
@@ -180,4 +199,6 @@
          search
          (m/SizedBox .height 10)
          breadcrumbs
-         data-table]))))
+         data-table
+         (m/SizedBox .height 10)
+         footer]))))
