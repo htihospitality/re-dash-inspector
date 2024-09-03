@@ -16,7 +16,7 @@ A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-
 
 # Prerequisites
 
-- [re-dash](https://github.com/htihospitality/re-dash) v1.1.0 minimum 
+- [re-dash](https://github.com/htihospitality/re-dash) v1.1.0 minimum
 - The contents of the app db need to be serializable to/from EDN using ClojureDart's `pr-str` and `cljd.reader/read-string`
 - The data in the inspector will only update if the inspector is currently open and visible on the screen while the database is mutated. If not, new changes will not reflect until a new event mutates the database and the inspector window is open at the time.
 
@@ -26,7 +26,7 @@ Add `re_dash_inspector` to your `dev_dependencies` in `pubspec.yaml`
 
 ```yaml
 dev_dependencies:
-  re_dash_inspector: ^0.0.2
+  re_dash_inspector: ^0.0.3
 ```
 
 then register the `debug` re-dash interceptor targeting dev-tools either in selected event handlers or globally in `main` like
@@ -95,5 +95,3 @@ dev_dependencies:
 ```
 
 Start your app, open Flutter DevTools, and you should see a tab for the re_dash extension.
-
-
