@@ -150,7 +150,7 @@
     (m/Row
       .mainAxisAlignment m/MainAxisAlignment.center
       .children
-      [(m/Text "Find re-dash useful? Consider donating via ")
+      [(m/Text "Find re-dash useful? Consider supporting us via ")
        (m/Text.rich
          (ui/LinkTextSpan
            .link (ui/Link
@@ -169,27 +169,59 @@
 
       :managed [search-controller (m/TextEditingController)]
 
-      :let [state (atom {})]
+      :let [state (atom {})
+
+            service-manager
+            ^service/ServiceManager
+            (get utils/globals service/ServiceManager)]
 
       :bind {:state             state
              :search-controller search-controller}
 
       :watch [;; Wait for the vm service to be available
               ^vm-service/VmService? vm-service
-              (-> ^service/ServiceManager (get utils/globals service/ServiceManager)
-                  .-onServiceAvailable
-                  await)
+              (-> service-manager .-onServiceAvailable await)
 
-              ;; Listen for new events from the connected app
-              ^vm-service/Event? event (when vm-service (.-onExtensionEvent vm-service))
+              ;; Wait for the connected app's main isolate
+              {:flds [id] :as ^vm-service/IsolateRef? _}
+              (when vm-service
+                (-> service-manager
+                    .-isolateManager
+                    .-mainIsolate))
 
-              ;; React to new events.
-              ;; We're only interested in events of a specific kind.
-              ;; Reset the db atom to the new deserialized (from edn) value
-              _ (when (and event (= "ext.re-dash" (.-extensionKind event)))
-                  (when-let [data (some-> event .-extensionData .-data)]
-                    (when-let [db (get data "db")]
-                      (defer #(swap! state assoc :db (r/read-string db))))))]
+              ;; Set the pause mode in the debugger to none to try and guard
+              ;; against pausing when doing a hot restart of the app
+              ;; TODO
+              ;; This does not really seem to help in preventing a pause
+              ;; when doing a hot restart of the app, so this can maybe be removed at some stage.
+              _ (when id
+                  (.setIsolatePauseMode vm-service id
+                                        .exceptionPauseMode "None"
+                                        .shouldPauseOnExit false))
+
+              ;; Listen for isolate pause events
+              {:flds [kind] :as ^vm-service/Event? _}
+              (when id (.getIsolatePauseEvent vm-service id))
+
+              ;; When we detect a pause event, we un-pause to try and guard
+              ;; against inadvertent pausing when doing a hot restart of the app.
+              ;; TODO
+              ;; This does mean we cannot pause the app in the debugger at all
+              ;; so ideally we need to determine why a hot restart pauses the isolate?
+              _ (when (= "PauseStart" kind)
+                  (.resume vm-service id))]
+
+      :managed [_ (when vm-service
+                    (-> vm-service
+                        .-onExtensionEvent
+                        (.listen
+                          (fn [{:flds [extensionKind extensionData] :as ^vm-service/Event _}]
+                            (when (and extensionData (= "ext.re-dash" extensionKind))
+                              (when-let [db (some-> ^vm-service/ExtensionData extensionData .-data (get "db"))]
+                                (defer #(swap! state assoc :db (r/read-string db)))))))))
+                :dispose ((fn [^async/StreamSubscription? s]
+                            (when s (.cancel s))))]
+
 
 
       (m/Column
