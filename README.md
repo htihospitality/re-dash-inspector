@@ -51,3 +51,8 @@ When hot restarting the app, DevTools sometimes pauses the app's main isolate fo
 We automatically recover from this situation by detecting a pause event and automatically resume, so there is no manual action needed from the developer.
 
 One caveat is that for some reason a half painted pause/resume notification remains in a banner on top of the DevTools UI. This notification seems unresponsive, but also does not affect anything negatively, i.e. it can merely be ignored. But in case you do want to get rid of it, just refresh the browser tab and it will be gone. This seems to be an issue in DevTools itself (albeit speculation) so hopefully it gets fixed in DevTools at some point.
+
+Example of the UI glitch that can safely be ignored:
+![resume-notification](https://github.com/user-attachments/assets/8e2ddec4-47b8-4e6b-bc01-2a57eb099435)
+
+
