@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.5
+### Changes
+- Fixed auto disposing of event listeners
+
 ## 0.0.4
 ### Changes
 - Fixed paused main isolate upon hot restart of app

@@ -26,7 +26,7 @@ Add `re_dash_inspector` to your `dev_dependencies` in `pubspec.yaml`
 
 ```yaml
 dev_dependencies:
-  re_dash_inspector: ^0.0.4
+  re_dash_inspector: ^0.0.5
 ```
 
 then register the `debug` re-dash interceptor targeting dev-tools either in selected event handlers or globally in `main` like
@@ -44,54 +44,10 @@ The DevTools extension is updated with a new copy of the app-db contents every t
 
 Keep this in mind while developing, as it might add some overhead to your application during each re-dash event loop. Importantly this will not impact your compiled application at all, only during development mode - if even noticeable at all.
 
-# Development
+# Known issues
 
-This section details some notes regarding contributing to the development of this extension itself.
+When hot restarting the app, DevTools sometimes pauses the app's main isolate for some unknown reason.
 
-> _These commands assumes you have [babashka](https://github.com/babashka/babashka) installed_
+We automatically recover from this situation by detecting a pause event and automatically resume, so there is no manual action needed from the developer.
 
-## DevTools Simulator
-
-The DevTools simulator allows for fast feedback during development of an extension. After cloning this project start the simulator with:
-
-```shell
-bb run
-```
-Now, when making changes to the ClojureDart source, your changes will get reloaded in the simulator.
-
-### Connect your app
-
-Start the app you want to connect with the extension running in the simulator by copying the VM service url of your app into the simulator and `connect`.
-
-The VM service url is normally printed to the console after starting your app for example:
-
-```
-A Dart VM Service on Linux is available at: http://127.0.0.1:39641/2WAFXuRKqwY=/
-```
-
-## DevTools
-
-When you're done developing and would like to test the extension in the actual DevTools connected to your app, run:
-
-```shell
-## This will compile ClojureDart, build the Flutter web artifacts,
-## and copy the assets to the `extension/devtools/build` folder
-
-bb build-copy
-```
-
-validate the build with
-
-```shell
-bb validate
-```
-
-now, in your app's `pubspec.yaml` reference the extension using a path coordinate like
-
-```yaml
-dev_dependencies:
-  re_dash_inspector:
-    path: /path/to/re_dash_inspector
-```
-
-Start your app, open Flutter DevTools, and you should see a tab for the re_dash extension.
+One caveat is that for some reason a half painted pause/resume notification remains in a banner on top of the DevTools UI. This notification seems unresponsive, but also does not affect anything negatively, i.e. it can merely be ignored. But in case you do want to get rid of it, just refresh the browser tab and it will be gone. This seems to be an issue in DevTools itself (albeit speculation) so hopefully it gets fixed in DevTools at some point.
