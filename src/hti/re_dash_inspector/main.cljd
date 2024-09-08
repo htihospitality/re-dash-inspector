@@ -10,6 +10,16 @@
             [cljd.reader :as r]
             [clojure.string :as string]))
 
+(deftype Inspector
+    [state]
+
+  (getState [_]
+    state))
+
+(defn ->state
+  []
+  (-> ^Inspector (get utils/globals Inspector) .getState))
+
 (defn- defer
   "Defers execution of the given function `f` until the next event loop."
   [f]
@@ -31,9 +41,8 @@
   "The data for the selected search / filter"
   (f/widget
 
-    :get {state :state}
-
-    :watch [{:keys [db selected-path search-text]} state
+    :watch [{:keys [db selected-path search-text]}
+            (->state) :as state
 
             dark-mode? (some-> ^ext/ExtensionManager
                                (get utils/globals ext/ExtensionManager)
@@ -96,9 +105,12 @@
   "When selecting an item from the table,
   breadcrumbs will show the way back."
   (f/widget
-    :get {state :state}
-    :watch [{:keys [selected-path]} state]
+
+    :watch [{:keys [selected-path]}
+            (->state) :as state]
+
     :when (seq selected-path)
+
     (m/Align
       .alignment m/Alignment.centerLeft)
     (m/Column
@@ -129,12 +141,13 @@
 
 (def search
   (f/widget
-    :get {state             :state
-          search-controller :search-controller}
+
+    :get {search-controller :search-controller}
+
     (ui/DevToolsClearableTextField
-      .labelText "Search database.."
+      .labelText "Search"
       .prefixIcon (m/Icon (m/Icons.search))
-      .onChanged #(swap! state assoc :search-text %)
+      .onChanged #(swap! (->state) assoc :search-text %)
       .controller search-controller)))
 
 
@@ -159,78 +172,122 @@
            .context ctx))])))
 
 
+(defn re-dash-event?
+  [{:flds [extensionKind] :as ^vm-service/Event _}]
+  (if (= "ext.re-dash" extensionKind)
+    true false))
+
+
+(defn handler
+  [{:flds [extensionData] :as ^vm-service/Event _}]
+  (when-let [db (some-> ^vm-service/ExtensionData extensionData
+                        .-data
+                        (get "db"))]
+    (defer #(swap! (->state) assoc :db (r/read-string db)))))
+
+
+(defn view
+  [^utils/AutoDisposeMixin parent]
+  (f/widget
+
+    :managed [search-controller (m/TextEditingController)]
+
+    :let [service-manager
+          ^service/ServiceManager
+          (get utils/globals service/ServiceManager)]
+
+    :bind {:search-controller search-controller}
+
+    :watch [;; Wait for the vm service to be available
+            ^vm-service/VmService? vm-service
+            (-> service-manager .-onServiceAvailable await)
+
+            ;; Subscribe to post events from re-dash.
+            ;; The reason we keep reference to and auto
+            ;; dispose of the StreamSubscription as opposed to
+            ;; merely :watch on the stream, is because this way
+            ;; the subscription doesn't pause when the devtools window is
+            ;; out of focus, which would otherwise cause us to lose events
+            ;; sent from the app.
+            _ (when vm-service
+                (.autoDisposeStreamSubscription
+                  parent
+                  (-> vm-service
+                      .-onExtensionEvent
+                      (.where #(re-dash-event? %))
+                      (.listen handler)))
+                nil)
+
+            ;; Wait for the connected app's main isolate
+            {:flds [id] :as ^vm-service/IsolateRef? _}
+            (when vm-service
+              (-> service-manager .-isolateManager .-mainIsolate))
+
+            ;; Set the pause mode in the debugger to none to try and guard
+            ;; against pausing when doing a hot restart of the app
+            ;; TODO
+            ;; This does not really seem to help in preventing a pause
+            ;; when doing a hot restart of the app, so this can possibly
+            ;; be removed at some stage.
+            _ (when id
+                (.setIsolatePauseMode
+                  vm-service id
+                  .exceptionPauseMode "None"
+                  .shouldPauseOnExit false))
+
+            ;; Listen for isolate pause events
+            {:flds [kind] :as ^vm-service/Event? _}
+            (when id (.getIsolatePauseEvent vm-service id))
+
+            ;; When we detect a pause event, we un-pause to try and guard
+            ;; against inadvertent pausing when doing a hot restart of the app.
+            ;; TODO
+            ;; This does mean we cannot pause the app in the debugger at all
+            ;; so ideally we need to determine why a hot restart pauses the isolate?
+            ;; Additionally, due to the undesirable pause when the app restarts,
+            ;; there lingers a weird paused notification in the devtools window that
+            ;; does not seem to affect anything, but it does not automatically
+            ;; disappear either - a refresh of devtools does get rid of it though.
+            _ (when (= "PauseStart" kind)
+                (.resume vm-service id))]
+
+
+    (m/Column
+      .children
+      [header
+       (m/SizedBox .height 10)
+       search
+       (m/SizedBox .height 10)
+       breadcrumbs
+       data-table
+       (m/SizedBox .height 10)
+       footer])))
+
+
 (defn main
   []
+
+  (m/WidgetsFlutterBinding.ensureInitialized)
+
+  ;; Initialise app state atom and store in provided globals
+  (utils/setGlobal Inspector (Inspector. (atom {})))
+
   (f/run
 
     ext/DevToolsExtension
 
-    (f/widget
+    ;; We reify StatefulWidget so we can use
+    ;; AutoDisposeMixin to auto dispose
+    ;; our event stream subscription.
 
-      :managed [search-controller (m/TextEditingController)]
+    (reify :extends m/StatefulWidget
+      :no-meta true
+      (createState [_]
+        (reify :extends m/State
+          :no-meta true
 
-      :let [state (atom {})
+          (build [this _ctx]
+            (view this))
 
-            service-manager
-            ^service/ServiceManager
-            (get utils/globals service/ServiceManager)]
-
-      :bind {:state             state
-             :search-controller search-controller}
-
-      :watch [;; Wait for the vm service to be available
-              ^vm-service/VmService? vm-service
-              (-> service-manager .-onServiceAvailable await)
-
-              ;; Wait for the connected app's main isolate
-              {:flds [id] :as ^vm-service/IsolateRef? _}
-              (when vm-service
-                (-> service-manager
-                    .-isolateManager
-                    .-mainIsolate))
-
-              ;; Set the pause mode in the debugger to none to try and guard
-              ;; against pausing when doing a hot restart of the app
-              ;; TODO
-              ;; This does not really seem to help in preventing a pause
-              ;; when doing a hot restart of the app, so this can maybe be removed at some stage.
-              _ (when id
-                  (.setIsolatePauseMode vm-service id
-                                        .exceptionPauseMode "None"
-                                        .shouldPauseOnExit false))
-
-              ;; Listen for isolate pause events
-              {:flds [kind] :as ^vm-service/Event? _}
-              (when id (.getIsolatePauseEvent vm-service id))
-
-              ;; When we detect a pause event, we un-pause to try and guard
-              ;; against inadvertent pausing when doing a hot restart of the app.
-              ;; TODO
-              ;; This does mean we cannot pause the app in the debugger at all
-              ;; so ideally we need to determine why a hot restart pauses the isolate?
-              _ (when (= "PauseStart" kind)
-                  (.resume vm-service id))]
-
-      :managed [_ (when vm-service
-                    (-> vm-service
-                        .-onExtensionEvent
-                        (.listen
-                          (fn [{:flds [extensionKind extensionData] :as ^vm-service/Event _}]
-                            (when (and extensionData (= "ext.re-dash" extensionKind))
-                              (when-let [db (some-> ^vm-service/ExtensionData extensionData .-data (get "db"))]
-                                (defer #(swap! state assoc :db (r/read-string db)))))))))
-                :dispose ((fn [^async/StreamSubscription? s]
-                            (when s (.cancel s))))]
-
-
-
-      (m/Column
-        .children
-        [header
-         (m/SizedBox .height 10)
-         search
-         (m/SizedBox .height 10)
-         breadcrumbs
-         data-table
-         (m/SizedBox .height 10)
-         footer]))))
+          ^:mixin utils/AutoDisposeMixin
+          (autoDisposeStreamSubscription [_this _sub]))))))
