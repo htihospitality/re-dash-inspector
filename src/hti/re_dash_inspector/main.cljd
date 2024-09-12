@@ -16,6 +16,21 @@
   (getState [_]
     state))
 
+(deftype Debouncer
+    [^:mutable ^async/Timer? timer]
+
+  (debounce [_ duration f]
+    (when timer (.cancel timer))
+    (set! timer (async/Timer duration f))
+    nil)
+
+  (dispose [_]
+    (when timer (.cancel timer))))
+
+(defn ^Debouncer ->debouncer
+  []
+  (->Debouncer nil))
+
 (defn ->state
   []
   (-> ^Inspector (get utils/globals Inspector) .getState))
@@ -27,15 +42,56 @@
 
 (defn- search-filter
   "Searches all keys and values containing the search text."
-  [[k v] search-text]
+  [item search-text]
   (if search-text
-    (or (-> (pr-str k)
-            string/lower-case
-            (string/includes? search-text))
-        (-> (pr-str v)
-            string/lower-case
-            (string/includes? search-text)))
+    (-> (pr-str item)
+        string/lower-case
+        (string/includes? search-text))
     true))
+
+(defn- map-row
+  [[k v] state]
+  (m/Row
+    .crossAxisAlignment m/CrossAxisAlignment.center
+    .children
+    [(f/widget
+       (m/Flexible .fit m/FlexFit.tight)
+       (m/Text (or (pr-str k) "")))
+     (m/SizedBox .width 10)
+     (f/widget
+       (m/Expanded .flex 2)
+       (m/InkWell
+         .onTap (fn []
+                  (when (and (coll? v) (not (coll? k)))
+                    (swap! state (fn [s]
+                                   (-> (update s :selected-path #(-> % vec (conj k)))
+                                       (assoc :search-text ""))))))
+         .mouseCursor (if (coll? v)
+                        m/WidgetStateMouseCursor.clickable
+                        m/SystemMouseCursors.basic))
+       (m/Text (or (pr-str v) "")
+               .maxLines 100
+               .overflow m/TextOverflow.ellipsis))]))
+
+(defn- seq-row
+  [item idx state]
+  (m/Row
+    .crossAxisAlignment m/CrossAxisAlignment.center
+    .children
+    [(f/widget
+       (m/Expanded .flex 2)
+       (m/InkWell
+         .onTap (fn []
+                  (when (coll? item)
+                    (swap! state (fn [s]
+                                   (-> (update s :selected-path #(-> % vec (conj idx)))
+                                       (assoc :search-text ""))))))
+         .mouseCursor (if (coll? item)
+                        m/WidgetStateMouseCursor.clickable
+                        m/SystemMouseCursors.basic))
+       (m/Text (or (pr-str item) "")
+               .maxLines 10
+               .overflow m/TextOverflow.ellipsis))]))
 
 (def data-table
   "The data for the selected search / filter"
@@ -60,45 +116,46 @@
 
             ;; The filtered & sorted list of map entries
             ;; to display on the ui
-            items (->> db'
-                       (into [])
-                       (filter #(search-filter % search-text))
-                       (sort-by (fn [[k _]] k))
-                       atom)]
+            items (cond
+
+                    (map? db')
+                    (->> db'
+                         (into [])
+                         (filter #(search-filter % search-text))
+                         (sort-by (fn [[k _]] k))
+                         atom)
+
+                    (or (sequential? db') (set? db'))
+                    (->> db'
+                         (filter #(search-filter % search-text))
+                         atom))
+
+            items-count (atom (count items))]
 
     m/Expanded
-    (m/ListView.builder
-      .itemCount (count items)
-      .itemBuilder
-      (f/build
-        [idx]
-        (let [[k v] (get items idx)]
-          (f/widget
-            (m/Container
-              .color (ui/alternatingColorForIndex idx color-scheme))
-            (m/Row
-              .crossAxisAlignment m/CrossAxisAlignment.center
-              .children
-              [(f/widget
-                 (m/Flexible .fit m/FlexFit.tight)
-                 (m/Text (or (pr-str k) "")))
-               (m/SizedBox .width 10)
-               (f/widget
-                 (m/Expanded .flex 2)
-                 (m/InkWell
-                   .onTap (fn []
-                            (when (and (map? v)
-                                       (or (keyword k)
-                                           (string? k)))
-                              (swap! state (fn [s]
-                                             (-> (update s :selected-path #(-> % vec (conj k)))
-                                                 (assoc :search-text ""))))))
-                   .mouseCursor (if (map? v)
-                                  m/WidgetStateMouseCursor.clickable
-                                  m/SystemMouseCursors.basic))
-                 (m/Text (or (pr-str v) "")
-                         .maxLines 1000
-                         .overflow m/TextOverflow.ellipsis))])))))))
+    (m/Column
+      .children
+      [(f/widget
+         m/Expanded
+         (m/ListView.builder
+           .itemCount items-count
+           .itemBuilder
+           (f/build
+             [idx]
+             (f/widget
+               (m/Container
+                 .color (ui/alternatingColorForIndex idx color-scheme)
+                 .padding (m/EdgeInsets.symmetric .vertical 3))
+               (let [item (get items idx)]
+                 (if (map? db')
+                   (map-row item state)
+                   (seq-row item idx state)))))))
+       (m/SizedBox .height 3)
+       (f/widget
+         ui/OutlineDecoration.onlyTop
+         (m/Row
+           .children
+           [(m/Text (str "Count: " items-count))]))])))
 
 
 (def breadcrumbs
@@ -123,14 +180,15 @@
                 (m/InkWell
                   .onTap (fn []
                            (swap! state assoc :selected-path [])))
-                (m/Text "/ root"))]
+                (m/Text "x"))]
              (map-indexed
                (fn [idx crumb]
                  (f/widget
                    (m/InkWell
                      .onTap (fn []
-                              (swap! state update :selected-path
-                                     #(take (inc idx) %))))
+                              (swap! state (fn [s]
+                                             (-> (update s :selected-path #(-> (inc idx) (take %) vec))
+                                                 (assoc :search-text ""))))))
                    (m/Container
                      .constraints (m/BoxConstraints .maxWidth 1000))
                    (m/Text (str " / " (pr-str crumb))
@@ -142,12 +200,25 @@
 (def search
   (f/widget
 
-    :get {search-controller :search-controller}
+    :get {^m/TextEditingController search-controller :search-controller}
+
+    :managed [debouncer (->debouncer)]
+
+    :watch [{:keys [search-text]
+             :or   {search-text ""}}
+            (->state)
+
+            _ (do (when (string/blank? search-text)
+                    (.-text! search-controller "")) nil)
+            :refresh-on search-text]
 
     (ui/DevToolsClearableTextField
       .labelText "Search"
       .prefixIcon (m/Icon (m/Icons.search))
-      .onChanged #(swap! (->state) assoc :search-text %)
+      .onChanged (fn [s]
+                   (.debounce debouncer
+                              (Duration .milliseconds 250)
+                              #(swap! (->state) assoc :search-text s)))
       .controller search-controller)))
 
 
@@ -174,7 +245,7 @@
 
 (defn re-dash-event?
   [{:flds [extensionKind] :as ^vm-service/Event _}]
-  (if (= "ext.re-dash" extensionKind)
+  (if (#{"re-dash"} extensionKind)
     true false))
 
 
@@ -210,6 +281,7 @@
             ;; out of focus, which would otherwise cause us to lose events
             ;; sent from the app.
             _ (when vm-service
+                (.cancelStreamSubscriptions parent)
                 (.autoDisposeStreamSubscription
                   parent
                   (-> vm-service
