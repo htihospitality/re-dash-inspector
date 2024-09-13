@@ -1,0 +1,25 @@
+(ns hti.re-dash-inspector.transformers
+  (:require
+   [clojure.walk :as w]))
+
+(defn sanitize
+  [m]
+  (w/postwalk
+    (fn [element]
+      (if (map-entry? element)
+        (let [[key val] element]
+          [key
+
+           (cond
+
+             ;; Empty maps behave weirdly when doing clojure.data/diff
+             ;; Here we merely reset them to {}
+             (and (map? val) (empty? val)) {}
+
+             ;; Empty lists behave weirdly when doing clojure.data/diff
+             ;; Here we merely reset them to '()
+             (and (list? val) (empty? val)) '()
+
+             :else val)])
+        element))
+    m))
