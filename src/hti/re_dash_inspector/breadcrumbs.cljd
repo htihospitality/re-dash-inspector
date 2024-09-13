@@ -1,0 +1,39 @@
+(ns hti.re-dash-inspector.breadcrumbs
+  (:require ["package:flutter/material.dart" :as m]
+            [cljd.flutter :as f]
+            [hti.re-dash.core :as rd]))
+
+(def view
+  "When selecting an item from the table,
+  breadcrumbs will show the way back."
+  (f/widget
+
+    :watch [selected-path (rd/subscribe [:rd.inspector/selected-path])]
+
+    :when (seq selected-path)
+
+    (m/Align
+      .alignment m/Alignment.centerLeft)
+    (m/Column
+      .mainAxisAlignment m/MainAxisAlignment.center
+      .children
+      [(m/SizedBox .height 3)
+       (f/widget
+         (m/Wrap
+           .children
+           (concat
+             [(f/widget
+                (m/InkWell
+                  .onTap #(rd/dispatch [:rd.inspector/clear-selected-path]))
+                (m/Text "x"))]
+             (map-indexed
+               (fn [idx crumb]
+                 (f/widget
+                   (m/InkWell
+                     .onTap #(rd/dispatch [:rd.inspector/update-selected-path idx]))
+                   (m/Container
+                     .constraints (m/BoxConstraints .maxWidth 1000))
+                   (m/Text (str " / " (pr-str crumb))
+                           .overflow m/TextOverflow.ellipsis)))
+               selected-path))))
+       (m/SizedBox .height 10)])))

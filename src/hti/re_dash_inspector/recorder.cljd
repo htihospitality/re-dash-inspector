@@ -1,0 +1,157 @@
+(ns hti.re-dash-inspector.recorder
+  (:require ["package:flutter/material.dart" :as m]
+            ["package:devtools_extensions/devtools_extensions.dart" :as ext]
+            ["package:devtools_app_shared/ui.dart" :as ui]
+            ["package:devtools_app_shared/utils.dart" :as utils]
+            [cljd.flutter :as f]
+            [hti.re-dash.core :as rd]))
+
+(defn- row
+  [{event-id :rd.inspector.event/id
+    number :rd.inspector.event/number
+    diff :rd.inspector.event/diff}]
+  (let [[db-before db-after] diff]
+    (f/widget
+      :watch [expanded? (atom false) :as expanded-state]
+      (m/InkWell
+        .onTap #(swap! expanded-state not)
+        .mouseCursor m/WidgetStateMouseCursor.clickable)
+      (m/Row
+        .crossAxisAlignment m/CrossAxisAlignment.center
+        .children
+        [(m/Text (str "#" number "   "))
+         (f/widget
+           (m/Flexible .fit m/FlexFit.tight)
+           (m/Text (or (pr-str event-id) "")))
+         (m/SizedBox .width 10)
+         (f/widget
+           (m/Expanded .flex 2)
+           (m/Text (pr-str (or db-before {}))
+                   .maxLines (if expanded? 10000 10)
+                   .overflow m/TextOverflow.ellipsis))
+         (m/SizedBox .width 10)
+         (f/widget
+           (m/Expanded .flex 2)
+           (m/Text (pr-str (or db-after {}))
+                   .maxLines (if expanded? 10000 10)
+                   .overflow m/TextOverflow.ellipsis))]))))
+
+(def view
+  "The data for the selected search / filter"
+  (f/widget
+
+    :context ctx
+
+    :watch [events (rd/subscribe [:rd.inspector/events])
+            recording? (rd/subscribe [:rd.inspector/recording?])
+
+            dark-mode? (some-> ^ext/ExtensionManager
+                               (get utils/globals ext/ExtensionManager)
+                               .-darkThemeEnabled)
+
+            color-scheme (atom (if dark-mode?
+                                 ui/darkColorScheme
+                                 ui/lightColorScheme))
+
+            ;; Narrow down the db map to only what's been selected
+            ;; (eg. when the user selected a nested map value from the ui)
+            #_#_db' (atom (if (seq selected-path)
+                            (get-in db selected-path)
+                            db))
+
+            ;; The filtered & sorted list of map entries
+            ;; to display on the ui
+            items (atom events)
+
+            items-count (atom (count items))]
+
+    (m/Column
+      .children
+      [(m/SizedBox .height 5)
+       (m/Row
+         .mainAxisAlignment m/MainAxisAlignment.center
+         .children
+         [(ui/DevToolsToggleButton
+            .onPressed #(rd/dispatch [:rd.inspector/toggle-recording])
+            .label (if recording? "Stop recording" "Start recording")
+            .isSelected recording?
+            .message (if recording? "Stop recording" "Start recording")
+            .icon (if recording? m/Icons.stop m/Icons.radio_button_checked))
+          (m/SizedBox .width 5)
+          (ui/DevToolsButton
+            .label "Clear recording"
+            .onPressed (when (and (seq items) (not recording?))
+                         #(rd/dispatch [:rd.inspector/clear-events]))
+            .icon m/Icons.delete_forever)])
+       (m/SizedBox .height 10)
+
+       (cond
+
+         (pos? items-count)
+         (f/widget
+           m/Expanded
+           (m/Column
+             .children
+             [(m/Row
+                .crossAxisAlignment m/CrossAxisAlignment.center
+                .children
+                [(m/SizedBox .width 10)
+                 (f/widget
+                   (m/Flexible .fit m/FlexFit.tight)
+                   m/Center
+                   (ui/DialogTitleText "Event"))
+                 (m/SizedBox .width 10)
+                 (f/widget
+                   (m/Expanded .flex 2)
+                   m/Center
+                   (ui/DialogTitleText "Removed"))
+                 (m/SizedBox .width 10)
+                 (f/widget
+                   (m/Expanded .flex 2)
+                   m/Center
+                   (ui/DialogTitleText "Added"))])
+              (m/SizedBox .height 5)
+              (f/widget
+                m/Expanded
+                (m/ListView.builder
+                  .itemCount items-count
+                  .itemBuilder
+                  (f/build
+                    [idx]
+                    (f/widget
+                      (m/Container
+                        .color (ui/alternatingColorForIndex idx color-scheme)
+                        .padding (m/EdgeInsets.symmetric .vertical 3))
+                      (let [item (get items idx)]
+                        (row item))))))]))
+
+         recording?
+         (f/widget
+           m/Expanded
+           (m/Column
+             .mainAxisAlignment m/MainAxisAlignment.center
+             .children
+             [(m/Text "Waiting for events from the connected app...")
+              (m/SizedBox .height 20)
+              (m/Text "If you haven't done so already, remember to configure the debug interceptor in your app with target :target/dev-tools")
+              (m/Text.rich
+                (ui/LinkTextSpan
+                  .link (ui/Link
+                          .display "See the documentation"
+                          .url "https://github.com/htihospitality/re-dash-inspector?tab=readme-ov-file#usage")
+                  .context ctx))]))
+
+         :else
+         (f/widget
+           m/Expanded
+           (m/Column
+             .mainAxisAlignment m/MainAxisAlignment.center
+             .children
+             [(m/Text "Click Start recording, to start receiving events from the connected app.")])))
+
+       (m/SizedBox .height 3)
+       (f/widget
+         ui/OutlineDecoration.onlyTop
+         (m/Row
+           .children
+           [(m/Text (str "Count: " items-count))]))])))

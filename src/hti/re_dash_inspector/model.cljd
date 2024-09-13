@@ -1,0 +1,80 @@
+(ns hti.re-dash-inspector.model
+  (:require ["package:vm_service/vm_service.dart" :as vm-service]
+            [hti.re-dash.core :as rd]
+            [cljd.reader :as r]
+            [clojure.data :as data]
+            [hti.re-dash-inspector.transformers :as tf]))
+
+(defn- handle-app-event
+  [{recording? :rd.inspector/recording?
+    db-before  :rd.inspector/db
+    :as        db}
+   [_ {:flds [extensionData] :as ^vm-service/Event _}]]
+
+  (let [data         (some-> ^vm-service/ExtensionData extensionData .-data)
+        app-db       (-> (get data "db") r/read-string)
+        app-event-id (-> (get data "event-id") r/read-string)]
+
+    (when app-db
+      (cond-> (assoc db :rd.inspector/db app-db)
+        recording? (update :rd.inspector/events
+                           (fn [app-events]
+                             (let [app-events' (take 5 app-events)]
+                               (conj app-events'
+                                     {:rd.inspector.event/id     app-event-id
+                                      :rd.inspector.event/number (-> app-events' first :rd.inspector.event/number ((fnil inc 0)))
+                                      :rd.inspector.event/diff   (data/diff (tf/sanitize db-before)
+                                                                            (tf/sanitize app-db))}))))))))
+
+(defn- set-search-text
+  [db [_ search-text]]
+  (assoc db :rd.inspector/search-text search-text))
+
+(defn- clear-selected-path
+  [db _]
+  (assoc db :rd.inspector/selected-path []))
+
+(defn- clear-events
+  [db _]
+  (assoc db :rd.inspector/events '()))
+
+(defn- toggle-recording
+  [db _]
+  (update db :rd.inspector/recording? #(not %)))
+
+(defn- update-selected-path
+  [db [_ idx]]
+  (-> (update db :rd.inspector/selected-path #(-> (inc idx) (take %) vec))
+      (assoc :rd.inspector/search-text "")))
+
+(defn- update-selected-path-coll
+  [db [_ id]]
+  (-> (update db :rd.inspector/selected-path #(-> % vec (conj id)))
+      (assoc :rd.inspector/search-text "")))
+
+(defn- initialize-db
+  [_ _]
+  {:rd.inspector/recording? false})
+
+(defn register!
+  []
+
+  (rd/reg-sub :rd.inspector/db :-> :rd.inspector/db)
+  (rd/reg-sub :rd.inspector/selected-path :-> :rd.inspector/selected-path)
+  (rd/reg-sub :rd.inspector/search-text :-> :rd.inspector/search-text)
+  (rd/reg-sub :rd.inspector/recording? :-> :rd.inspector/recording?)
+  (rd/reg-sub :rd.inspector/events :-> :rd.inspector/events)
+
+  (rd/reg-event-db :rd.inspector/initialize-db initialize-db)
+
+  (rd/reg-event-db :rd.inspector/set-search-text set-search-text)
+
+  (rd/reg-event-db :rd.inspector/update-selected-path update-selected-path)
+  (rd/reg-event-db :rd.inspector/update-selected-path-coll update-selected-path-coll)
+  (rd/reg-event-db :rd.inspector/clear-selected-path clear-selected-path)
+
+  (rd/reg-event-db :rd.inspector/clear-events clear-events)
+
+  (rd/reg-event-db :rd.inspector/toggle-recording toggle-recording)
+
+  (rd/reg-event-db :rd.inspector/handle-app-event handle-app-event))

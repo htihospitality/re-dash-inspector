@@ -1,0 +1,128 @@
+(ns hti.re-dash-inspector.inspector
+  (:require ["package:flutter/material.dart" :as m]
+            ["package:devtools_extensions/devtools_extensions.dart" :as ext]
+            ["package:devtools_app_shared/ui.dart" :as ui]
+            ["package:devtools_app_shared/utils.dart" :as utils]
+            [cljd.flutter :as f]
+            [hti.re-dash-inspector.search :as search]
+            [hti.re-dash.core :as rd]))
+
+(defn- map-row
+  [[k v]]
+  (m/Row
+    .crossAxisAlignment m/CrossAxisAlignment.center
+    .children
+    [(f/widget
+       (m/Flexible .fit m/FlexFit.tight)
+       (m/Text (or (pr-str k) "")))
+     (m/SizedBox .width 10)
+     (f/widget
+       (m/Expanded .flex 2)
+       (m/InkWell
+         .onTap #(when (and (coll? v) (not (coll? k)))
+                   (rd/dispatch [:rd.inspector/update-selected-path-coll k]))
+         .mouseCursor (if (coll? v)
+                        m/WidgetStateMouseCursor.clickable
+                        m/SystemMouseCursors.basic))
+       (m/Text (or (pr-str v) "")
+               .maxLines 100
+               .overflow m/TextOverflow.ellipsis))]))
+
+(defn- seq-row
+  [item idx]
+  (m/Row
+    .crossAxisAlignment m/CrossAxisAlignment.center
+    .children
+    [(f/widget
+       (m/Expanded .flex 2)
+       (m/InkWell
+         .onTap #(when (coll? item)
+                   (rd/dispatch [:rd.inspector/update-selected-path-coll idx]))
+         .mouseCursor (if (coll? item)
+                        m/WidgetStateMouseCursor.clickable
+                        m/SystemMouseCursors.basic))
+       (m/Text (or (pr-str item) "")
+               .maxLines 10
+               .overflow m/TextOverflow.ellipsis))]))
+
+(def view
+  "The data for the selected search / filter"
+  (f/widget
+
+    :context ctx
+
+    :watch [db (rd/subscribe [:rd.inspector/db])
+            search-text (rd/subscribe [:rd.inspector/search-text])
+            selected-path (rd/subscribe [:rd.inspector/selected-path])
+
+            dark-mode? (some-> ^ext/ExtensionManager
+                               (get utils/globals ext/ExtensionManager)
+                               .-darkThemeEnabled)
+
+            color-scheme (atom (if dark-mode?
+                                 ui/darkColorScheme
+                                 ui/lightColorScheme))
+
+            ;; Narrow down the db map to only what's been selected
+            ;; (eg. when the user selected a nested map value from the ui)
+            db' (atom (if (seq selected-path)
+                        (get-in db selected-path)
+                        db))
+
+            ;; The filtered & sorted list of map entries
+            ;; to display on the ui
+            items (cond
+
+                    (map? db')
+                    (->> db'
+                         (into [])
+                         (filter #(search/search-filter % search-text))
+                         (sort-by (fn [[k _]] k))
+                         atom)
+
+                    (or (sequential? db') (set? db'))
+                    (->> db'
+                         (filter #(search/search-filter % search-text))
+                         atom))
+
+            items-count (atom (count items))]
+
+    (if (pos? items-count)
+
+      (m/Column
+        .children
+        [(m/SizedBox .height 5)
+         (f/widget
+           m/Expanded
+           (m/ListView.builder
+             .itemCount items-count
+             .itemBuilder
+             (f/build
+               [idx]
+               (f/widget
+                 (m/Container
+                   .color (ui/alternatingColorForIndex idx color-scheme)
+                   .padding (m/EdgeInsets.symmetric .vertical 3))
+                 (let [item (get items idx)]
+                   (if (map? db')
+                     (map-row item)
+                     (seq-row item idx)))))))
+         (m/SizedBox .height 3)
+         (f/widget
+           ui/OutlineDecoration.onlyTop
+           (m/Row
+             .children
+             [(m/Text (str "Count: " items-count))]))])
+
+      (m/Column
+        .mainAxisAlignment m/MainAxisAlignment.center
+        .children
+        [(m/Text "Waiting for events from the connected app...")
+         (m/SizedBox .height 20)
+         (m/Text "If you haven't done so already, remember to configure the debug interceptor in your app with target :target/dev-tools")
+         (m/Text.rich
+         (ui/LinkTextSpan
+           .link (ui/Link
+                   .display "See the documentation"
+                   .url "https://github.com/htihospitality/re-dash-inspector?tab=readme-ov-file#usage")
+           .context ctx))]))))

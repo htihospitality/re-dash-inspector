@@ -1,0 +1,17 @@
+(ns hti.re-dash-inspector.debouncer
+  (:require ["dart:async" :as async]))
+
+(deftype Debouncer
+    [^:mutable ^async/Timer? timer]
+
+  (debounce [_ duration f]
+    (when timer (.cancel timer))
+    (set! timer (async/Timer duration f))
+    nil)
+
+  (dispose [_]
+    (when timer (.cancel timer))))
+
+(defn ^Debouncer ->debouncer
+  []
+  (->Debouncer nil))

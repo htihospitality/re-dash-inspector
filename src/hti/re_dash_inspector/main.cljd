@@ -1,414 +1,20 @@
 (ns hti.re-dash-inspector.main
-  (:require ["package:flutter/material.dart" :as m]
-            ["package:devtools_extensions/devtools_extensions.dart" :as ext]
-            ["package:devtools_app_shared/service.dart" :as service]
-            ["package:devtools_app_shared/ui.dart" :as ui]
-            ["package:devtools_app_shared/utils.dart" :as utils]
-            ["package:vm_service/vm_service.dart" :as vm-service]
-            ["dart:async" :as async]
-            [cljd.flutter :as f]
-            [cljd.reader :as r]
-            [clojure.string :as string]
-            [clojure.data :as data]
-            [hti.re-dash-inspector.transformers :as tf]))
+  (:require
+   ["package:devtools_app_shared/service.dart" :as service]
+   ["package:devtools_app_shared/utils.dart" :as utils]
+   ["package:devtools_extensions/devtools_extensions.dart" :as ext]
+   ["package:flutter/material.dart" :as m]
+   ["package:vm_service/vm_service.dart" :as vm-service]
+   [cljd.flutter :as f]
+   [hti.re-dash-inspector.breadcrumbs :as breadcrumbs]
+   [hti.re-dash-inspector.footer :as footer]
+   [hti.re-dash-inspector.inspector :as inspector]
+   [hti.re-dash-inspector.recorder :as recorder]
+   [hti.re-dash-inspector.search :as search]
+   [hti.re-dash-inspector.model :as model]
+   [hti.re-dash.core :as rd]))
 
-(deftype Inspector
-    [state]
-
-  (getState [_]
-    state))
-
-(deftype Debouncer
-    [^:mutable ^async/Timer? timer]
-
-  (debounce [_ duration f]
-    (when timer (.cancel timer))
-    (set! timer (async/Timer duration f))
-    nil)
-
-  (dispose [_]
-    (when timer (.cancel timer))))
-
-(defn ^Debouncer ->debouncer
-  []
-  (->Debouncer nil))
-
-(defn ->state
-  []
-  (-> ^Inspector (get utils/globals Inspector) .getState))
-
-(defn- defer
-  "Defers execution of the given function `f` until the next event loop."
-  [f]
-  (async/Timer.run f))
-
-(defn- search-filter
-  "Searches all keys and values containing the search text."
-  [item search-text]
-  (if search-text
-    (-> (pr-str item)
-        string/lower-case
-        (string/includes? search-text))
-    true))
-
-(defn- inspector-map-row
-  [[k v] state]
-  (m/Row
-    .crossAxisAlignment m/CrossAxisAlignment.center
-    .children
-    [(f/widget
-       (m/Flexible .fit m/FlexFit.tight)
-       (m/Text (or (pr-str k) "")))
-     (m/SizedBox .width 10)
-     (f/widget
-       (m/Expanded .flex 2)
-       (m/InkWell
-         .onTap (fn []
-                  (when (and (coll? v) (not (coll? k)))
-                    (swap! state (fn [s]
-                                   (-> (update s :selected-path #(-> % vec (conj k)))
-                                       (assoc :search-text ""))))))
-         .mouseCursor (if (coll? v)
-                        m/WidgetStateMouseCursor.clickable
-                        m/SystemMouseCursors.basic))
-       (m/Text (or (pr-str v) "")
-               .maxLines 100
-               .overflow m/TextOverflow.ellipsis))]))
-
-(defn- inspector-seq-row
-  [item idx state]
-  (m/Row
-    .crossAxisAlignment m/CrossAxisAlignment.center
-    .children
-    [(f/widget
-       (m/Expanded .flex 2)
-       (m/InkWell
-         .onTap (fn []
-                  (when (coll? item)
-                    (swap! state (fn [s]
-                                   (-> (update s :selected-path #(-> % vec (conj idx)))
-                                       (assoc :search-text ""))))))
-         .mouseCursor (if (coll? item)
-                        m/WidgetStateMouseCursor.clickable
-                        m/SystemMouseCursors.basic))
-       (m/Text (or (pr-str item) "")
-               .maxLines 10
-               .overflow m/TextOverflow.ellipsis))]))
-
-(defn- recorder-row
-  [{:keys [event-id number diff]} _idx _state]
-  (let [[db-before db-after] diff]
-    (f/widget
-      :watch [expanded? (atom false) :as expanded-state]
-      (m/InkWell
-        .onTap #(swap! expanded-state not)
-        .mouseCursor m/WidgetStateMouseCursor.clickable)
-      (m/Row
-        .crossAxisAlignment m/CrossAxisAlignment.center
-        .children
-        [(m/Text (str "#" number "   "))
-         (f/widget
-           (m/Flexible .fit m/FlexFit.tight)
-           (m/Text (or (pr-str event-id) "")))
-         (m/SizedBox .width 10)
-         (f/widget
-           (m/Expanded .flex 2)
-           (m/Text (pr-str (or db-before {}))
-                   .maxLines (if expanded? 10000 10)
-                   .overflow m/TextOverflow.ellipsis))
-         (m/SizedBox .width 10)
-         (f/widget
-           (m/Expanded .flex 2)
-           (m/Text (pr-str (or db-after {}))
-                   .maxLines (if expanded? 10000 10)
-                   .overflow m/TextOverflow.ellipsis))]))))
-
-(def inspector-view
-  "The data for the selected search / filter"
-  (f/widget
-
-    :context ctx
-
-    :watch [{:keys [db selected-path search-text]}
-            (->state) :as state
-
-            dark-mode? (some-> ^ext/ExtensionManager
-                               (get utils/globals ext/ExtensionManager)
-                               .-darkThemeEnabled)
-
-            color-scheme (atom (if dark-mode?
-                                 ui/darkColorScheme
-                                 ui/lightColorScheme))
-
-            ;; Narrow down the db map to only what's been selected
-            ;; (eg. when the user selected a nested map value from the ui)
-            db' (atom (if (seq selected-path)
-                        (get-in db selected-path)
-                        db))
-
-            ;; The filtered & sorted list of map entries
-            ;; to display on the ui
-            items (cond
-
-                    (map? db')
-                    (->> db'
-                         (into [])
-                         (filter #(search-filter % search-text))
-                         (sort-by (fn [[k _]] k))
-                         atom)
-
-                    (or (sequential? db') (set? db'))
-                    (->> db'
-                         (filter #(search-filter % search-text))
-                         atom))
-
-            items-count (atom (count items))]
-
-    (if (pos? items-count)
-
-      (m/Column
-        .children
-        [(m/SizedBox .height 5)
-         (f/widget
-           m/Expanded
-           (m/ListView.builder
-             .itemCount items-count
-             .itemBuilder
-             (f/build
-               [idx]
-               (f/widget
-                 (m/Container
-                   .color (ui/alternatingColorForIndex idx color-scheme)
-                   .padding (m/EdgeInsets.symmetric .vertical 3))
-                 (let [item (get items idx)]
-                   (if (map? db')
-                     (inspector-map-row item state)
-                     (inspector-seq-row item idx state)))))))
-         (m/SizedBox .height 3)
-         (f/widget
-           ui/OutlineDecoration.onlyTop
-           (m/Row
-             .children
-             [(m/Text (str "Count: " items-count))]))])
-
-      (m/Column
-        .mainAxisAlignment m/MainAxisAlignment.center
-        .children
-        [(m/Text "Waiting for events from the connected app...")
-         (m/SizedBox .height 20)
-         (m/Text "If you haven't done so already, remember to configure the debug interceptor in your app with target :target/devtools")
-         (m/Text.rich
-         (ui/LinkTextSpan
-           .link (ui/Link
-                   .display "See the documentation"
-                   .url "https://github.com/htihospitality/re-dash-inspector?tab=readme-ov-file#usage")
-           .context ctx))]))))
-
-(def recorder-view
-  "The data for the selected search / filter"
-  (f/widget
-
-    :context ctx
-
-    :watch [{:keys [events selected-path search-text recording?]
-             :or   {recording? false}}
-            (->state) :as state
-
-            dark-mode? (some-> ^ext/ExtensionManager
-                               (get utils/globals ext/ExtensionManager)
-                               .-darkThemeEnabled)
-
-            color-scheme (atom (if dark-mode?
-                                 ui/darkColorScheme
-                                 ui/lightColorScheme))
-
-            ;; Narrow down the db map to only what's been selected
-            ;; (eg. when the user selected a nested map value from the ui)
-            #_#_db' (atom (if (seq selected-path)
-                            (get-in db selected-path)
-                            db))
-
-            ;; The filtered & sorted list of map entries
-            ;; to display on the ui
-            items (atom events)
-
-            items-count (atom (count items))]
-
-    (m/Column
-      .children
-      [(m/SizedBox .height 5)
-       (m/Row
-         .mainAxisAlignment m/MainAxisAlignment.center
-         .children
-         [(ui/DevToolsToggleButton
-            .onPressed #(swap! state update :recording? (constantly (not recording?)))
-            .label (if recording? "Stop recording" "Start recording")
-            .isSelected recording?
-            .message (if recording? "Stop recording" "Start recording")
-            .icon (if recording? m/Icons.stop m/Icons.radio_button_checked))
-          (m/SizedBox .width 5)
-          (ui/DevToolsButton
-            .label "Clear recording"
-            .onPressed (when (and (seq items) (not recording?))
-                         #(swap! state assoc :events '()))
-            .icon m/Icons.delete_forever)])
-       (m/SizedBox .height 10)
-
-       (cond
-
-         (pos? items-count)
-         (f/widget
-           m/Expanded
-           (m/Column
-             .children
-             [(m/Row
-                .crossAxisAlignment m/CrossAxisAlignment.center
-                .children
-                [(m/SizedBox .width 10)
-                 (f/widget
-                   (m/Flexible .fit m/FlexFit.tight)
-                   m/Center
-                   (ui/DialogTitleText "Event"))
-                 (m/SizedBox .width 10)
-                 (f/widget
-                   (m/Expanded .flex 2)
-                   m/Center
-                   (ui/DialogTitleText "Removed"))
-                 (m/SizedBox .width 10)
-                 (f/widget
-                   (m/Expanded .flex 2)
-                   m/Center
-                   (ui/DialogTitleText "Added"))])
-              (m/SizedBox .height 5)
-              (f/widget
-                m/Expanded
-                (m/ListView.builder
-                  .itemCount items-count
-                  .itemBuilder
-                  (f/build
-                    [idx]
-                    (f/widget
-                      (m/Container
-                        .color (ui/alternatingColorForIndex idx color-scheme)
-                        .padding (m/EdgeInsets.symmetric .vertical 3))
-                      (let [item (get items idx)]
-                        (recorder-row item idx state))))))]))
-
-         recording?
-         (f/widget
-           m/Expanded
-           (m/Column
-             .mainAxisAlignment m/MainAxisAlignment.center
-             .children
-             [(m/Text "Waiting for events from the connected app...")
-              (m/SizedBox .height 20)
-              (m/Text "If you haven't done so already, remember to configure the debug interceptor in your app with target :target/devtools")
-              (m/Text.rich
-                (ui/LinkTextSpan
-                  .link (ui/Link
-                          .display "See the documentation"
-                          .url "https://github.com/htihospitality/re-dash-inspector?tab=readme-ov-file#usage")
-                  .context ctx))]))
-
-         :else
-         (f/widget
-           m/Expanded
-           (m/Column
-             .mainAxisAlignment m/MainAxisAlignment.center
-             .children
-             [(m/Text "Click Start recording, to start receiving events from the connected app.")])))
-
-       (m/SizedBox .height 3)
-       (f/widget
-         ui/OutlineDecoration.onlyTop
-         (m/Row
-           .children
-           [(m/Text (str "Count: " items-count))]))])))
-
-
-(def breadcrumbs
-  "When selecting an item from the table,
-  breadcrumbs will show the way back."
-  (f/widget
-
-    :watch [{:keys [selected-path]}
-            (->state) :as state]
-
-    :when (seq selected-path)
-
-    (m/Align
-      .alignment m/Alignment.centerLeft)
-    (m/Column
-      .mainAxisAlignment m/MainAxisAlignment.center
-      .children
-      [(m/SizedBox .height 3)
-       (f/widget
-         (m/Wrap
-           .children
-           (concat
-             [(f/widget
-                (m/InkWell
-                  .onTap (fn []
-                           (swap! state assoc :selected-path [])))
-                (m/Text "x"))]
-             (map-indexed
-               (fn [idx crumb]
-                 (f/widget
-                   (m/InkWell
-                     .onTap (fn []
-                              (swap! state (fn [s]
-                                             (-> (update s :selected-path #(-> (inc idx) (take %) vec))
-                                                 (assoc :search-text ""))))))
-                   (m/Container
-                     .constraints (m/BoxConstraints .maxWidth 1000))
-                   (m/Text (str " / " (pr-str crumb))
-                           .overflow m/TextOverflow.ellipsis)))
-               selected-path))))
-       (m/SizedBox .height 10)])))
-
-
-(def search
-  (f/widget
-
-    :get {^m/TextEditingController search-controller :search-controller}
-
-    :managed [debouncer (->debouncer)]
-
-    :watch [{:keys [search-text]
-             :or   {search-text ""}}
-            (->state)
-
-            _ (do (when (string/blank? search-text)
-                    (.-text! search-controller "")) nil)
-            :refresh-on search-text]
-
-    (ui/DevToolsClearableTextField
-      .labelText "Search"
-      .prefixIcon (m/Icon (m/Icons.search))
-      .onChanged (fn [s]
-                   (.debounce debouncer
-                              (Duration .milliseconds 250)
-                              #(swap! (->state) assoc :search-text s)))
-      .controller search-controller)))
-
-(def footer
-  (f/widget
-    :context ctx
-    ui/RoundedOutlinedBorder
-    (m/Padding .padding (m/EdgeInsets.all 2))
-    (m/Row
-      .mainAxisAlignment m/MainAxisAlignment.center
-      .children
-      [(m/Text "Find re-dash useful? Consider supporting us via ")
-       (m/Text.rich
-         (ui/LinkTextSpan
-           .link (ui/Link
-                   .display "Github Sponsors"
-                   .url "https://github.com/sponsors/htihospitality")
-           .context ctx))])))
-
-
-(defn re-dash-event?
+(defn- app-event?
   [{:flds [extensionKind timestamp] :as ^vm-service/Event _}
    subscribed-at]
 
@@ -423,26 +29,6 @@
         ;; alas, for some reason the Extension Stream of the VM resends past events.
         (>= timestamp subscribed-at))
     true false))
-
-
-(defn handler
-  [{:flds [extensionData] :as ^vm-service/Event _}]
-  (let [data     (some-> ^vm-service/ExtensionData extensionData .-data)
-        db       (-> (get data "db") r/read-string)
-        event-id (-> (get data "event-id") r/read-string)]
-
-    (when db
-      (defer #(swap! (->state)
-                     (fn [{recording? :recording?
-                           db-before  :db
-                           :as        state}]
-                       (cond-> (assoc state :db db)
-                         recording? (update :events (fn [events]
-                                                      (conj events {:event-id event-id
-                                                                    :number   (-> events count inc)
-                                                                    :diff     (data/diff (tf/sanitize db-before)
-                                                                                         (tf/sanitize db))}))))))))))
-
 
 (defn view
   [^utils/AutoDisposeMixin parent]
@@ -474,8 +60,8 @@
                   (let [subscribed-at (-> (DateTime/now) .-millisecondsSinceEpoch)]
                     (-> vm-service
                         .-onExtensionEvent
-                        (.where #(re-dash-event? % subscribed-at))
-                        (.listen handler))))
+                        (.where #(app-event? % subscribed-at))
+                        (.listen #(rd/dispatch [:rd.inspector/handle-app-event %])))))
                 nil)
 
 
@@ -516,7 +102,7 @@
 
     (m/Scaffold
       .appBar (m/AppBar
-                .title search
+                .title search/view
                 .bottom
                 (m/TabBar
                   .isScrollable true
@@ -528,24 +114,24 @@
       (m/Column
         .children
         [(m/SizedBox .height 5)
-         breadcrumbs
+         breadcrumbs/view
          (f/widget
            m/Expanded
            (m/TabBarView
              .children
-             [inspector-view
-              recorder-view]))
+             [inspector/view
+              recorder/view]))
          (m/SizedBox .height 3)
-         footer]))))
-
+         footer/view]))))
 
 (defn main
   []
 
   (m/WidgetsFlutterBinding.ensureInitialized)
 
-  ;; Initialise app state atom and store in provided globals
-  (utils/setGlobal Inspector (Inspector. (atom {})))
+  (model/register!)
+
+  (await (rd/dispatch-sync [:rd.inspector/initialize-db]))
 
   (f/run
 
