@@ -25,8 +25,9 @@
                                (conj app-events'
                                      {:rd.inspector.event/id     app-event-id
                                       :rd.inspector.event/number (-> app-events' first :rd.inspector.event/number ((fnil inc 0)))
-                                      :rd.inspector.event/diff   (data/diff (tf/sanitize db-before)
-                                                                            (tf/sanitize app-db))}))))))))
+                                      :rd.inspector.event/diff   (->> (data/diff (tf/sanitize db-before)
+                                                                                 (tf/sanitize app-db))
+                                                                      (take 2))}))))))))
 
 (defn- set-search-text
   [db [_ search-text]]

@@ -7,7 +7,8 @@
             [cljd.flutter :as f]
             [hti.re-dash.core :as rd]
             [hti.re-dash-inspector.async :as async]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [hti.re-dash-inspector.search :as search]))
 
 (defn- row
   [{event-id :rd.inspector.event/id
@@ -83,6 +84,8 @@
 
     :watch [events (rd/subscribe [:rd.inspector/events])
             recording? (rd/subscribe [:rd.inspector/recording?])
+            search-text (rd/subscribe [:rd.inspector/search-text])
+            selected-path (rd/subscribe [:rd.inspector/selected-path])
 
             dark-mode? (some-> ^ext/ExtensionManager
                                (get utils/globals ext/ExtensionManager)
@@ -92,15 +95,22 @@
                                  ui/darkColorScheme
                                  ui/lightColorScheme))
 
-            ;; Narrow down the db map to only what's been selected
-            ;; (eg. when the user selected a nested map value from the ui)
-            #_#_db' (atom (if (seq selected-path)
-                            (get-in db selected-path)
-                            db))
+            searched-events (atom (filter #(search/search-filter % search-text) events))
 
             ;; The filtered & sorted list of map entries
             ;; to display on the ui
-            items (atom events)
+            items (atom (if (seq selected-path)
+
+                          ;; Narrow down the db map to only what's been selected
+                          ;; (eg. when the user selected a nested map value from the ui)
+                          (map (fn [event]
+                                 (update event :rd.inspector.event/diff
+                                         (fn [[db-before db-after]]
+                                           [(get-in db-before selected-path)
+                                            (get-in db-after selected-path)])))
+                               searched-events)
+
+                          searched-events))
 
             items-count (atom (count items))]
 
