@@ -3,7 +3,8 @@
             [hti.re-dash.core :as rd]
             [cljd.reader :as r]
             [clojure.data :as data]
-            [hti.re-dash-inspector.transformers :as tf]))
+            [hti.re-dash-inspector.transformers :as tf]
+            [clojure.string :as string]))
 
 (defn- handle-app-event
   [{recording? :rd.inspector/recording?
@@ -35,7 +36,9 @@
 
 (defn- clear-selected-path
   [db _]
-  (assoc db :rd.inspector/selected-path nil))
+  (assoc db
+         :rd.inspector/selected-path nil
+         :rd.inspector/selected-path-error? false))
 
 (defn- clear-events
   [db _]
@@ -56,7 +59,17 @@
 
 (defn- set-selected-path
   [db [_ selected-path]]
-  (assoc db :rd.inspector/selected-path selected-path))
+  (try
+    (if (string/blank? selected-path)
+      (assoc db :rd.inspector/selected-path-error? false)
+      (let [selected-path' (r/read-string selected-path)]
+        (if (vector? selected-path')
+          (assoc db
+                 :rd.inspector/selected-path selected-path'
+                 :rd.inspector/selected-path-error? false)
+          (assoc db :rd.inspector/selected-path-error? true))))
+    (catch dynamic e
+      (assoc db :rd.inspector/selected-path-error? true))))
 
 (defn- update-selected-path-coll
   [db [_ id]]
@@ -78,6 +91,7 @@
 
   (rd/reg-sub :rd.inspector/db :-> :rd.inspector/db)
   (rd/reg-sub :rd.inspector/selected-path :-> :rd.inspector/selected-path)
+  (rd/reg-sub :rd.inspector/selected-path-error? :-> :rd.inspector/selected-path-error?)
   (rd/reg-sub :rd.inspector/selected-path-editable? :-> :rd.inspector/selected-path-editable?)
   (rd/reg-sub :rd.inspector/search-text :-> :rd.inspector/search-text)
   (rd/reg-sub :rd.inspector/recording? :-> :rd.inspector/recording?)

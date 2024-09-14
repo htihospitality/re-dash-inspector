@@ -5,36 +5,43 @@
             [hti.re-dash.core :as rd]
             [hti.re-dash-inspector.debouncer :as debouncer]
             [hti.re-dash-inspector.async :as async]
-            [clojure.string :as string]
-            [cljd.reader :as r]))
+            [clojure.string :as string]))
 
 (def editable-view
   (f/widget
 
     :get {^m/TextEditingController path-controller :path-controller}
 
-    :managed [debouncer (debouncer/->debouncer)]
+    :managed [debouncer (debouncer/->debouncer)
+              focus-node (m/FocusNode)]
+
+    :watch [focused? (f/sub focus-node (fn [_] (.-hasFocus focus-node)))]
+
+    :let [should-update-controller-value? (not focused?)]
 
     :watch [selected-path (rd/subscribe [:rd.inspector/selected-path])
+            selected-path-error? (rd/subscribe [:rd.inspector/selected-path-error?])
 
-            _ (async/defer #(.-value! path-controller
-                                      (let [selected-path' (str selected-path)]
-                                        (m/TextEditingValue
-                                          .text selected-path'
-                                          .selection (m/TextSelection.fromPosition
-                                                       (m/TextPosition .offset (count selected-path')))))))]
+            _ (async/defer
+                #(when should-update-controller-value?
+                   (.-text! path-controller (str selected-path))))]
 
-    (ui/DevToolsClearableTextField
-      .labelText "Path"
-      .prefixIcon (m/InkWell
-                    .child (m/Icon (m/Icons.swap_horiz))
-                    .onTap #(rd/dispatch [:rd.inspector/toggle-selected-path-editable?]))
+    (m/TextField
+      .focusNode focus-node
+      .decoration (m/InputDecoration
+                    .border (m/OutlineInputBorder)
+                    .labelText "Path"
+                    .prefixIcon (m/InkWell
+                                  .child (m/Icon (m/Icons.swap_horiz))
+                                  .onTap #(rd/dispatch [:rd.inspector/toggle-selected-path-editable?]))
+                    .errorText (when selected-path-error? "Invalid EDN path vector"))
+      .style (m/TextStyle .fontSize ui/defaultFontSize)
       .onChanged (fn [path]
                    (.debounce debouncer
                               (Duration .milliseconds 250)
                               #(if (string/blank? path)
                                  (rd/dispatch [:rd.inspector/clear-selected-path])
-                                 (rd/dispatch [:rd.inspector/set-selected-path (r/read-string path)]))))
+                                 (rd/dispatch [:rd.inspector/set-selected-path path]))))
       .controller path-controller)))
 
 (def non-editable-view
