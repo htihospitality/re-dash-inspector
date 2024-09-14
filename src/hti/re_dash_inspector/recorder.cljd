@@ -43,16 +43,16 @@
 (def max-events-input
   (f/widget
     :get {form-state :rd.inspector.settings/form}
-    :managed [max-events-ctrl (m/TextEditingController)]
+    :managed [controller (m/TextEditingController)]
     :watch [{max-events :rd.inspector.setting/max-events} form-state
-            _ (async/defer #(.-value! max-events-ctrl
+            _ (async/defer #(.-value! controller
                                       (let [max-events' (str max-events)]
                                         (m/TextEditingValue
                                           .text max-events'
                                           .selection (m/TextSelection.fromPosition
                                                        (m/TextPosition .offset (count max-events')))))))]
     (m/TextField
-      .controller max-events-ctrl
+      .controller controller
       .decoration (m/InputDecoration
                     .border (m/OutlineInputBorder)
                     .labelText "Max events to keep in memory")
@@ -60,6 +60,16 @@
       .inputFormatters [f.services/FilteringTextInputFormatter.digitsOnly]
       .onChanged #(swap! form-state assoc :rd.inspector.setting/max-events (if (string/blank? %)
                                                                              0 (int/parse %))))))
+
+(def hide-events-with-no-diff
+  (f/widget
+    :get {form-state :rd.inspector.settings/form}
+    :watch [{hide-events-with-no-diff? :rd.inspector.setting/hide-events-with-no-diff?} form-state]
+
+    (m/SwitchListTile
+      .onChanged #(swap! form-state assoc :rd.inspector.setting/hide-events-with-no-diff? %)
+      .title (m/Text "Hide events with no diff")
+      .value hide-events-with-no-diff?)))
 
 (def settings-dialog
   (f/widget
@@ -70,11 +80,20 @@
       .title (ui/DialogTitleText "Settings")
       .content (m/Column
                  .children
-                 [max-events-input])
+                 [max-events-input
+                  (m/SizedBox .height 5)
+                  hide-events-with-no-diff])
       .actions
       [(ui/DialogCancelButton)
        (ui/DialogApplyButton
          .onPressed #(rd/dispatch [:rd.inspector/apply-settings @form-state]))])))
+
+(defn- no-diff-filter
+  [{[db-before db-after] :rd.inspector.event/diff}
+   hide-events-with-no-diff?]
+  (if hide-events-with-no-diff?
+    (or (seq db-before) (seq db-after))
+    true))
 
 (def view
   "The data for the selected search / filter"
@@ -87,6 +106,9 @@
             search-text (rd/subscribe [:rd.inspector/search-text])
             selected-path (rd/subscribe [:rd.inspector/selected-path])
 
+            {hide-events-with-no-diff? :rd.inspector.setting/hide-events-with-no-diff?}
+            (rd/subscribe [:rd.inspector/settings])
+
             dark-mode? (some-> ^ext/ExtensionManager
                                (get utils/globals ext/ExtensionManager)
                                .-darkThemeEnabled)
@@ -95,22 +117,26 @@
                                  ui/darkColorScheme
                                  ui/lightColorScheme))
 
-            searched-events (atom (filter #(search/search-filter % search-text) events))
 
             ;; The filtered & sorted list of map entries
             ;; to display on the ui
-            items (atom (if (seq selected-path)
+            items-narrowed (atom (if (seq selected-path)
 
-                          ;; Narrow down the db map to only what's been selected
-                          ;; (eg. when the user selected a nested map value from the ui)
-                          (map (fn [event]
-                                 (update event :rd.inspector.event/diff
-                                         (fn [[db-before db-after]]
-                                           [(get-in db-before selected-path)
-                                            (get-in db-after selected-path)])))
-                               searched-events)
+                                   ;; Narrow down the db map to only what's been selected
+                                   ;; (eg. when the user selected a nested map value from the ui)
+                                   (map (fn [event]
+                                          (update event :rd.inspector.event/diff
+                                                  (fn [[db-before db-after]]
+                                                    [(get-in db-before selected-path)
+                                                     (get-in db-after selected-path)])))
+                                        events)
 
-                          searched-events))
+                                   events))
+
+            items (atom (filter #(and (search/search-filter % search-text)
+                                      (no-diff-filter % hide-events-with-no-diff?))
+                                items-narrowed))
+
 
             items-count (atom (count items))]
 

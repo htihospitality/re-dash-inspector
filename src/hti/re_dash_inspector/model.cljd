@@ -102,7 +102,8 @@
   [_ _]
   {:rd.inspector/recording? false
    :rd.inspector/selected-path-editable? false
-   :rd.inspector/settings {:rd.inspector.setting/max-events 100}})
+   :rd.inspector/settings {:rd.inspector.setting/max-events 100
+                           :rd.inspector.setting/hide-events-with-no-diff? false}})
 
 (defn register!
   []
