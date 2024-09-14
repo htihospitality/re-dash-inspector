@@ -1,0 +1,12 @@
+(ns hti.re-dash-inspector.async
+  (:require ["dart:async" :as async]))
+
+(defn defer
+  "Defers execution of the given function `f` until the next event loop.
+
+  Notes:
+  • Setting state while a widget is being built is disallowed by flutter.
+  • This should be used for any execution that sets state for a widget that would otherwise
+    occur synchronously, while a widget is being built."
+  [f]
+  (async/Timer.run f))

@@ -7,7 +7,9 @@
 
 (defn- handle-app-event
   [{recording? :rd.inspector/recording?
+    {max-events :rd.inspector.setting/max-events} :rd.inspector/settings
     db-before  :rd.inspector/db
+    :or {max-events 100}
     :as        db}
    [_ {:flds [extensionData] :as ^vm-service/Event _}]]
 
@@ -19,7 +21,7 @@
       (cond-> (assoc db :rd.inspector/db app-db)
         recording? (update :rd.inspector/events
                            (fn [app-events]
-                             (let [app-events' (take 5 app-events)]
+                             (let [app-events' (take (dec max-events) app-events)]
                                (conj app-events'
                                      {:rd.inspector.event/id     app-event-id
                                       :rd.inspector.event/number (-> app-events' first :rd.inspector.event/number ((fnil inc 0)))
@@ -52,9 +54,14 @@
   (-> (update db :rd.inspector/selected-path #(-> % vec (conj id)))
       (assoc :rd.inspector/search-text "")))
 
+(defn- apply-settings
+  [db [_ settings]]
+  (assoc db :rd.inspector/settings settings))
+
 (defn- initialize-db
   [_ _]
-  {:rd.inspector/recording? false})
+  {:rd.inspector/recording? false
+   :rd.inspector/settings {:rd.inspector.setting/max-events 100}})
 
 (defn register!
   []
@@ -64,10 +71,13 @@
   (rd/reg-sub :rd.inspector/search-text :-> :rd.inspector/search-text)
   (rd/reg-sub :rd.inspector/recording? :-> :rd.inspector/recording?)
   (rd/reg-sub :rd.inspector/events :-> :rd.inspector/events)
+  (rd/reg-sub :rd.inspector/settings :-> :rd.inspector/settings)
 
   (rd/reg-event-db :rd.inspector/initialize-db initialize-db)
 
   (rd/reg-event-db :rd.inspector/set-search-text set-search-text)
+
+  (rd/reg-event-db :rd.inspector/apply-settings apply-settings)
 
   (rd/reg-event-db :rd.inspector/update-selected-path update-selected-path)
   (rd/reg-event-db :rd.inspector/update-selected-path-coll update-selected-path-coll)

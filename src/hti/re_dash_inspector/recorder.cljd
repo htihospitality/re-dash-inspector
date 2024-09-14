@@ -3,8 +3,11 @@
             ["package:devtools_extensions/devtools_extensions.dart" :as ext]
             ["package:devtools_app_shared/ui.dart" :as ui]
             ["package:devtools_app_shared/utils.dart" :as utils]
+            ["package:flutter/services.dart" :as f.services]
             [cljd.flutter :as f]
-            [hti.re-dash.core :as rd]))
+            [hti.re-dash.core :as rd]
+            [hti.re-dash-inspector.async :as async]
+            [clojure.string :as string]))
 
 (defn- row
   [{event-id :rd.inspector.event/id
@@ -35,6 +38,42 @@
            (m/Text (pr-str (or db-after {}))
                    .maxLines (if expanded? 10000 10)
                    .overflow m/TextOverflow.ellipsis))]))))
+
+(def max-events-input
+  (f/widget
+    :get {form-state :rd.inspector.settings/form}
+    :managed [max-events-ctrl (m/TextEditingController)]
+    :watch [{max-events :rd.inspector.setting/max-events} form-state
+            _ (async/defer #(.-value! max-events-ctrl
+                                      (let [max-events' (str max-events)]
+                                        (m/TextEditingValue
+                                          .text max-events'
+                                          .selection (m/TextSelection.fromPosition
+                                                       (m/TextPosition .offset (count max-events')))))))]
+    (m/TextField
+      .controller max-events-ctrl
+      .decoration (m/InputDecoration
+                    .border (m/OutlineInputBorder)
+                    .labelText "Max events to keep in memory")
+      .keyboardType m/TextInputType.number
+      .inputFormatters [f.services/FilteringTextInputFormatter.digitsOnly]
+      .onChanged #(swap! form-state assoc :rd.inspector.setting/max-events (if (string/blank? %)
+                                                                             0 (int/parse %))))))
+
+(def settings-dialog
+  (f/widget
+    :watch [settings (rd/subscribe [:rd.inspector/settings])]
+    :let [form-state (atom settings)]
+    :bind {:rd.inspector.settings/form form-state}
+    (ui/DevToolsDialog
+      .title (ui/DialogTitleText "Settings")
+      .content (m/Column
+                 .children
+                 [max-events-input])
+      .actions
+      [(ui/DialogCancelButton)
+       (ui/DialogApplyButton
+         .onPressed #(rd/dispatch [:rd.inspector/apply-settings @form-state]))])))
 
 (def view
   "The data for the selected search / filter"
@@ -71,7 +110,8 @@
        (m/Row
          .mainAxisAlignment m/MainAxisAlignment.center
          .children
-         [(ui/DevToolsToggleButton
+         [(m/Spacer)
+          (ui/DevToolsToggleButton
             .onPressed #(rd/dispatch [:rd.inspector/toggle-recording])
             .label (if recording? "Stop recording" "Start recording")
             .isSelected recording?
@@ -82,7 +122,15 @@
             .label "Clear recording"
             .onPressed (when (and (seq items) (not recording?))
                          #(rd/dispatch [:rd.inspector/clear-events]))
-            .icon m/Icons.delete_forever)])
+            .icon m/Icons.delete_forever)
+          (m/Spacer)
+          (ui/DevToolsButton
+            .onPressed (fn []
+                         (do (m/showDialog
+                               .context ctx
+                               .builder (f/build settings-dialog))
+                             nil))
+            .icon m/Icons.settings)])
        (m/SizedBox .height 10)
 
        (cond
