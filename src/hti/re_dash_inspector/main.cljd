@@ -34,13 +34,15 @@
   [^utils/AutoDisposeMixin parent]
   (f/widget
 
-    :managed [search-controller (m/TextEditingController)]
+    :managed [search-controller (m/TextEditingController)
+              path-controller (m/TextEditingController)]
 
     :let [service-manager
           ^service/ServiceManager
           (get utils/globals service/ServiceManager)]
 
-    :bind {:search-controller search-controller}
+    :bind {:search-controller search-controller
+           :path-controller path-controller}
 
     :watch [;; Wait for the vm service to be available
             ^vm-service/VmService? vm-service

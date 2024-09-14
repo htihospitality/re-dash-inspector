@@ -35,7 +35,7 @@
 
 (defn- clear-selected-path
   [db _]
-  (assoc db :rd.inspector/selected-path []))
+  (assoc db :rd.inspector/selected-path nil))
 
 (defn- clear-events
   [db _]
@@ -45,10 +45,18 @@
   [db _]
   (update db :rd.inspector/recording? #(not %)))
 
+(defn- toggle-selected-path-editable?
+  [db _]
+  (update db :rd.inspector/selected-path-editable? #(not %)))
+
 (defn- update-selected-path
   [db [_ idx]]
   (-> (update db :rd.inspector/selected-path #(-> (inc idx) (take %) vec))
       (assoc :rd.inspector/search-text "")))
+
+(defn- set-selected-path
+  [db [_ selected-path]]
+  (assoc db :rd.inspector/selected-path selected-path))
 
 (defn- update-selected-path-coll
   [db [_ id]]
@@ -62,6 +70,7 @@
 (defn- initialize-db
   [_ _]
   {:rd.inspector/recording? false
+   :rd.inspector/selected-path-editable? false
    :rd.inspector/settings {:rd.inspector.setting/max-events 100}})
 
 (defn register!
@@ -69,6 +78,7 @@
 
   (rd/reg-sub :rd.inspector/db :-> :rd.inspector/db)
   (rd/reg-sub :rd.inspector/selected-path :-> :rd.inspector/selected-path)
+  (rd/reg-sub :rd.inspector/selected-path-editable? :-> :rd.inspector/selected-path-editable?)
   (rd/reg-sub :rd.inspector/search-text :-> :rd.inspector/search-text)
   (rd/reg-sub :rd.inspector/recording? :-> :rd.inspector/recording?)
   (rd/reg-sub :rd.inspector/events :-> :rd.inspector/events)
@@ -82,7 +92,9 @@
 
   (rd/reg-event-db :rd.inspector/update-selected-path update-selected-path)
   (rd/reg-event-db :rd.inspector/update-selected-path-coll update-selected-path-coll)
+  (rd/reg-event-db :rd.inspector/set-selected-path set-selected-path)
   (rd/reg-event-db :rd.inspector/clear-selected-path clear-selected-path)
+  (rd/reg-event-db :rd.inspector/toggle-selected-path-editable? toggle-selected-path-editable?)
 
   (rd/reg-event-db :rd.inspector/clear-events clear-events)
 

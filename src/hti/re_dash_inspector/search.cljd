@@ -4,7 +4,8 @@
             [cljd.flutter :as f]
             [clojure.string :as string]
             [hti.re-dash-inspector.debouncer :as debouncer]
-            [hti.re-dash.core :as rd]))
+            [hti.re-dash.core :as rd]
+            [hti.re-dash-inspector.async :as async]))
 
 (defn search-filter
   "Searches all keys and values containing the search text."
@@ -24,8 +25,8 @@
 
     :watch [search-text (rd/subscribe [:rd.inspector/search-text])
 
-            _ (do (when (string/blank? search-text)
-                    (.-text! search-controller "")) nil)
+            _ (async/defer #(when (string/blank? search-text)
+                              (.-text! search-controller "")))
             :refresh-on search-text]
 
     (ui/DevToolsClearableTextField
