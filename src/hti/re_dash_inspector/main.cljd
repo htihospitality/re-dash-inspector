@@ -42,7 +42,7 @@
           (get utils/globals service/ServiceManager)]
 
     :bind {:search-controller search-controller
-           :path-controller path-controller}
+           :path-controller   path-controller}
 
     :watch [;; Wait for the vm service to be available
             ^vm-service/VmService? vm-service
@@ -102,29 +102,25 @@
 
     (m/DefaultTabController .length 2)
 
-    (m/Scaffold
-      .appBar (m/AppBar
-                .title search/view
-                .bottom
-                (m/TabBar
-                  .isScrollable true
-                  .tabs
-                  [(m/Tab .text "Inspector")
-                   (m/Tab .text "Recorder")]))
-
-      .body
-      (m/Column
-        .children
-        [(m/SizedBox .height 5)
-         breadcrumbs/view
-         (f/widget
-           m/Expanded
-           (m/TabBarView
-             .children
-             [inspector/view
-              recorder/view]))
-         (m/SizedBox .height 3)
-         footer/view]))))
+    (m/Column
+      .children
+      [(m/TabBar
+         .isScrollable true
+         .tabs
+         [(m/Tab .text "Inspector")
+          (m/Tab .text "Recorder")])
+       (m/SizedBox .height 5)
+       search/view
+       (m/SizedBox .height 5)
+       breadcrumbs/view
+       (f/widget
+         m/Expanded
+         (m/TabBarView
+           .children
+           [inspector/view
+            recorder/view]))
+       (m/SizedBox .height 3)
+       footer/view])))
 
 (defn main
   []

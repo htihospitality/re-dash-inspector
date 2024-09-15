@@ -35,7 +35,6 @@
                                   .child (m/Icon (m/Icons.swap_horiz))
                                   .onTap #(rd/dispatch [:rd.inspector/toggle-selected-path-editable?]))
                     .errorText (when selected-path-error? "Invalid EDN path vector"))
-      .style (m/TextStyle .fontSize ui/defaultFontSize)
       .onChanged (fn [path]
                    (.debounce debouncer
                               (Duration .milliseconds 250)

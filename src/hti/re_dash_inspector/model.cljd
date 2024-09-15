@@ -55,7 +55,7 @@
 (defn- clear-selected-path
   [db _]
   (assoc db
-         :rd.inspector/selected-path nil
+         :rd.inspector/selected-path []
          :rd.inspector/selected-path-error? false))
 
 (defn- clear-events
@@ -101,6 +101,7 @@
 (defn- initialize-db
   [_ _]
   {:rd.inspector/recording? false
+   :rd.inspector/selected-path []
    :rd.inspector/selected-path-editable? false
    :rd.inspector/settings {:rd.inspector.setting/max-events 100
                            :rd.inspector.setting/hide-events-with-no-diff? false}})
