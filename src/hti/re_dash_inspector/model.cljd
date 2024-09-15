@@ -26,15 +26,15 @@
 
 (defn- add-app-event
   [{{max-events :rd.inspector.setting/max-events} :rd.inspector/settings
-    :as db}
+    :as                                           db}
    [_ event-diff]]
 
   (update db :rd.inspector/events
           (fn [app-events]
-            (let [app-events' (take (dec max-events) app-events)]
-              (conj app-events'
-                    (assoc event-diff :rd.inspector.event/number
-                           (-> app-events' first :rd.inspector.event/number ((fnil inc 0)))))))))
+            (->> (conj app-events
+                       (assoc event-diff :rd.inspector.event/number
+                              (-> app-events first :rd.inspector.event/number ((fnil inc 0)))))
+                 (take max-events)))))
 
 (defn- calc-diff
   [{event-id  :rd.inspector.event/id
