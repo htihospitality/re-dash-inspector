@@ -14,27 +14,31 @@
      {max-events :rd.inspector.setting/max-events}
      :rd.inspector/settings
 
-     :as        db} :db}
+     :as db} :db}
    [_ {:flds [extensionData] :as ^vm-service/Event _}]]
 
-  (let [data         (some-> ^vm-service/ExtensionData extensionData .-data)
-        app-db       (-> (get data "db") r/read-string)
-        app-event-id (-> (get data "event-id") r/read-string)
+  (let [data   (some-> ^vm-service/ExtensionData extensionData .-data)
+        app-db (-> (get data "db") r/read-string)]
 
-        app-event {:rd.inspector.event/id        app-event-id
-                   :rd.inspector.event/db-before db-before
-                   :rd.inspector.event/db-after  app-db
-                   :rd.inspector.event/number
-                   (-> app-events first :rd.inspector.event/number ((fnil inc 0)))}
+    (if recording?
 
-        app-events' (->> (conj app-events app-event)
-                         (take max-events))]
+      (let [app-event-id (-> (get data "event-id") r/read-string)
 
-    (cond-> {:db (assoc db
-                        :rd.inspector/db app-db
-                        :rd.inspector/events app-events')}
+            app-event {:rd.inspector.event/id        app-event-id
+                       :rd.inspector.event/db-before db-before
+                       :rd.inspector.event/db-after  app-db
+                       :rd.inspector.event/number
+                       (-> app-events first :rd.inspector.event/number ((fnil inc 0)))}
 
-      recording? (merge {:rd.inspector/calc-diff app-event}))))
+            app-events' (->> (conj app-events app-event)
+                             (take max-events))]
+
+        {:db                     (assoc db
+                                        :rd.inspector/db app-db
+                                        :rd.inspector/events app-events')
+         :rd.inspector/calc-diff app-event})
+
+      {:db (assoc db :rd.inspector/db app-db)})))
 
 
 (defn- handle-worker-event
