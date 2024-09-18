@@ -1,52 +1,59 @@
 (ns hti.re-dash-inspector.model
-  (:require ["package:vm_service/vm_service.dart" :as vm-service]
+  (:require ["package:web/web.dart" :as web]
+            ["package:vm_service/vm_service.dart" :as vm-service]
+            ["package:devtools_app_shared/utils.dart" :as utils]
             [hti.re-dash.core :as rd]
             [cljd.reader :as r]
-            [clojure.data :as data]
-            [hti.re-dash-inspector.transformers :as tf]
-            [clojure.string :as string]
-            [hti.re-dash-inspector.async :as async]))
+            [clojure.string :as string]))
 
 (defn- handle-app-event
-  [{{recording?                                    :rd.inspector/recording?
-     db-before                                     :rd.inspector/db
-     :as                                           db} :db}
+  [{{recording? :rd.inspector/recording?
+     db-before  :rd.inspector/db
+     app-events :rd.inspector/events
+
+     {max-events :rd.inspector.setting/max-events}
+     :rd.inspector/settings
+
+     :as        db} :db}
    [_ {:flds [extensionData] :as ^vm-service/Event _}]]
 
   (let [data         (some-> ^vm-service/ExtensionData extensionData .-data)
         app-db       (-> (get data "db") r/read-string)
-        app-event-id (-> (get data "event-id") r/read-string)]
+        app-event-id (-> (get data "event-id") r/read-string)
 
-    (cond-> {:db (assoc db :rd.inspector/db app-db)}
+        app-event {:rd.inspector.event/id        app-event-id
+                   :rd.inspector.event/db-before db-before
+                   :rd.inspector.event/db-after  app-db
+                   :rd.inspector.event/number
+                   (-> app-events first :rd.inspector.event/number ((fnil inc 0)))}
 
-      recording? (merge {:rd.inspector/calc-diff
-                         {:rd.inspector.event/id        app-event-id
-                          :rd.inspector.event/db-before db-before
-                          :rd.inspector.event/db-after  app-db}}))))
+        app-events' (->> (conj app-events app-event)
+                         (take max-events))]
 
-(defn- add-app-event
-  [{{max-events :rd.inspector.setting/max-events} :rd.inspector/settings
-    :as                                           db}
-   [_ event-diff]]
+    (cond-> {:db (assoc db
+                        :rd.inspector/db app-db
+                        :rd.inspector/events app-events')}
+
+      recording? (merge {:rd.inspector/calc-diff app-event}))))
+
+
+(defn- handle-worker-event
+  [db [_ {worker-event-number :rd.inspector.event/number
+          :as worker-event}]]
 
   (update db :rd.inspector/events
           (fn [app-events]
-            (->> (conj app-events
-                       (assoc event-diff :rd.inspector.event/number
-                              (-> app-events first :rd.inspector.event/number ((fnil inc 0)))))
-                 (take max-events)))))
+            (map (fn [{app-event-number :rd.inspector.event/number :as app-event}]
+                   (if (= worker-event-number app-event-number)
+                     (merge app-event worker-event)
+                     app-event))
+                 app-events))))
 
 (defn- calc-diff
-  [{event-id  :rd.inspector.event/id
-    db-before :rd.inspector.event/db-before
-    db-after  :rd.inspector.event/db-after}]
+  [event-dbs]
 
-  (let [event-diff {:rd.inspector.event/id   event-id
-                    :rd.inspector.event/diff (->> (data/diff (tf/sanitize db-before)
-                                                             (tf/sanitize db-after))
-                                                  (take 2))}]
-
-    (async/defer #(rd/dispatch [ :rd.inspector/add-app-event event-diff]))))
+  (let [worker (get utils/globals web/Worker)]
+    (.postMessage worker (prn-str event-dbs))))
 
 (defn- set-search-text
   [db [_ search-text]]
@@ -135,5 +142,5 @@
   (rd/reg-event-db :rd.inspector/toggle-recording toggle-recording)
 
   (rd/reg-event-fx :rd.inspector/handle-app-event handle-app-event)
-  (rd/reg-event-db :rd.inspector/add-app-event add-app-event)
+  (rd/reg-event-db :rd.inspector/handle-worker-event handle-worker-event)
   (rd/reg-fx :rd.inspector/calc-diff calc-diff))

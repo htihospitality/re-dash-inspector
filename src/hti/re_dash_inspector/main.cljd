@@ -5,6 +5,7 @@
    ["package:devtools_extensions/devtools_extensions.dart" :as ext]
    ["package:flutter/material.dart" :as m]
    ["package:vm_service/vm_service.dart" :as vm-service]
+   ["package:web/web.dart" :as web]
    [cljd.flutter :as f]
    [hti.re-dash-inspector.breadcrumbs :as breadcrumbs]
    [hti.re-dash-inspector.footer :as footer]
@@ -12,7 +13,8 @@
    [hti.re-dash-inspector.recorder :as recorder]
    [hti.re-dash-inspector.search :as search]
    [hti.re-dash-inspector.model :as model]
-   [hti.re-dash.core :as rd]))
+   [hti.re-dash.core :as rd]
+   [cljd.reader :as r]))
 
 (defn- app-event?
   [{:flds [extensionKind timestamp] :as ^vm-service/Event _}
@@ -44,9 +46,27 @@
     :bind {:search-controller search-controller
            :path-controller   path-controller}
 
-    :watch [;; Wait for the vm service to be available
+    :watch [;; Start the background web worker
+            _ (let [worker (web/Worker "/worker/out/worker.js")]
+
+                (utils/setGlobal web/Worker worker)
+
+                (.autoDisposeStreamSubscription
+                  parent
+                  (-> worker .-onMessage
+                      (.listen #(rd/dispatch [:rd.inspector/handle-worker-event
+                                              (some-> % .-data r/read-string)]))))
+
+                nil)
+
+            ;; Wait for the vm service to be available
             ^vm-service/VmService? vm-service
             (-> service-manager .-onServiceAvailable await)
+
+            ;; Without setting this flag, every time the app
+            ;; hot restarts, then the isolate is paused
+            _ (when vm-service
+                (.setFlag vm-service "pause_isolates_on_start" "false"))
 
             ;; Subscribe to post events from re-dash.
             ;; The reason we keep reference to and auto
@@ -68,9 +88,9 @@
 
 
             ;; Wait for the connected app's main isolate
-            {:flds [id] :as ^vm-service/IsolateRef? _}
-            (when vm-service
-              (-> service-manager .-isolateManager .-mainIsolate))
+            ;; {:flds [id] :as ^vm-service/IsolateRef? _}
+            ;; (when vm-service
+            ;;   (-> service-manager .-isolateManager .-mainIsolate))
 
             ;; Set the pause mode in the debugger to none to try and guard
             ;; against pausing when doing a hot restart of the app
@@ -78,15 +98,15 @@
             ;; This does not really seem to help in preventing a pause
             ;; when doing a hot restart of the app, so this can possibly
             ;; be removed at some stage.
-            _ (when id
-                (.setIsolatePauseMode
-                  vm-service id
-                  .exceptionPauseMode "None"
-                  .shouldPauseOnExit false))
+            ;; _ (when id
+            ;;     (.setIsolatePauseMode
+            ;;       vm-service id
+            ;;       .exceptionPauseMode "None"
+            ;;       .shouldPauseOnExit false))
 
-            ;; Listen for isolate pause events
-            {:flds [kind] :as ^vm-service/Event? _}
-            (when id (.getIsolatePauseEvent vm-service id))
+            ;; ;; Listen for isolate pause events
+            ;; {:flds [kind] :as ^vm-service/Event? _}
+            ;; (when id (.getIsolatePauseEvent vm-service id))
 
             ;; When we detect a pause event, we un-pause to try and guard
             ;; against inadvertent pausing when doing a hot restart of the app.
@@ -97,8 +117,9 @@
             ;; there lingers a weird paused notification in the devtools window that
             ;; does not seem to affect anything, but it does not automatically
             ;; disappear either - a refresh of devtools does get rid of it though.
-            _ (when (= "PauseStart" kind)
-                (.resume vm-service id))]
+            ;; _ (when (= "PauseStart" kind)
+            ;;     (.resume vm-service id))
+            ]
 
     (m/DefaultTabController .length 2)
 

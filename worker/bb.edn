@@ -1,0 +1,9 @@
+{:paths ["script"]
+ :deps  {}
+ :tasks
+ {compile {:doc  "Compile app"
+           :task (shell "clojure -M:cljd compile")}
+
+  compile-js {:doc  "Compile to JS"
+              :task (shell "dart compile js -o out/worker.js lib/cljd-out/hti/re-dash-inspector/worker.dart" #_"dart compile js -O2 -o out/worker.js lib/cljd-out/hti/re-dash-inspector/worker.dart")
+              :depends [compile]}}}

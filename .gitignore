@@ -57,3 +57,6 @@ test/cljd-out/
 /extension/devtools/build/
 /src/hti/re_dash_inspector/.clj-kondo/
 /src/hti/re_dash_inspector/.lsp/
+/worker/.envrc
+/worker/lib/cljd-out/
+/worker/out/

@@ -12,8 +12,8 @@
 
 (defn- row
   [{event-id :rd.inspector.event/id
-    number :rd.inspector.event/number
-    diff :rd.inspector.event/diff}]
+    number   :rd.inspector.event/number
+    diff     :rd.inspector.event/diff}]
   (let [[db-before db-after] diff]
     (f/widget
       :watch [expanded? (atom false) :as expanded-state]
@@ -23,22 +23,27 @@
       (m/Row
         .crossAxisAlignment m/CrossAxisAlignment.center
         .children
-        [(m/Text (str "#" number "   "))
-         (f/widget
-           (m/Flexible .fit m/FlexFit.tight)
-           (m/Text (or (pr-str event-id) "")))
-         (m/SizedBox .width 10)
-         (f/widget
-           (m/Expanded .flex 2)
-           (m/Text (pr-str (or db-before {}))
-                   .maxLines (if expanded? 10000 10)
-                   .overflow m/TextOverflow.ellipsis))
-         (m/SizedBox .width 10)
-         (f/widget
-           (m/Expanded .flex 2)
-           (m/Text (pr-str (or db-after {}))
-                   .maxLines (if expanded? 10000 10)
-                   .overflow m/TextOverflow.ellipsis))]))))
+        (->> [(m/Text (str "#" number "   "))
+              (f/widget
+                (m/Flexible .fit m/FlexFit.tight)
+                (m/Text (or (pr-str event-id) "")))
+              (m/SizedBox .width 10)
+              (if (some nil? [db-before db-after])
+                (f/widget
+                  (m/Expanded .flex 4)
+                  (m/LinearProgressIndicator))
+                [(f/widget
+                   (m/Expanded .flex 2)
+                   (m/Text (pr-str db-before)
+                           .maxLines (if expanded? 10000 10)
+                           .overflow m/TextOverflow.ellipsis))
+                 (m/SizedBox .width 10)
+                 (f/widget
+                   (m/Expanded .flex 2)
+                   (m/Text (pr-str db-after)
+                           .maxLines (if expanded? 10000 10)
+                           .overflow m/TextOverflow.ellipsis))])]
+             flatten)))))
 
 (def max-events-input
   (f/widget
@@ -156,7 +161,7 @@
           (m/SizedBox .width 5)
           (ui/DevToolsButton
             .label "Clear recording"
-            .onPressed (when (and (seq items) (not recording?))
+            .onPressed (when (seq items)
                          #(rd/dispatch [:rd.inspector/clear-events]))
             .icon m/Icons.delete_forever)
           (m/Spacer)
