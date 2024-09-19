@@ -56,7 +56,7 @@
 (defn- calc-diff
   [event-dbs]
 
-  (let [worker (get utils/globals web/Worker)]
+  (let [^web/Worker worker (get utils/globals web/Worker)]
     (.postMessage worker (prn-str event-dbs))))
 
 (defn- set-search-text

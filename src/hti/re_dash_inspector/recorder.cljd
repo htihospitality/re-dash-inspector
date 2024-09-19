@@ -31,7 +31,8 @@
               (if (some nil? [db-before db-after])
                 (f/widget
                   (m/Expanded .flex 4)
-                  (m/LinearProgressIndicator))
+                  (m/LinearProgressIndicator
+                    .minHeight 1))
                 [(f/widget
                    (m/Expanded .flex 2)
                    (m/Text (pr-str db-before)
