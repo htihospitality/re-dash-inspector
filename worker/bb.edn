@@ -1,9 +1,16 @@
 {:paths ["script"]
  :deps  {}
  :tasks
- {compile {:doc  "Compile app"
-           :task (shell "clojure -M:cljd compile")}
+ {compile-cljd {:doc  "Compile app"
+                :task (shell "clojure -M:cljd compile")}
 
-  compile-js {:doc  "Compile to JS"
-              :task (shell "dart compile js -O2 -o out/worker.js lib/cljd-out/hti/re-dash-inspector/worker.dart")
-              :depends [compile]}}}
+  compile {:doc      "Compile to JS"
+           :requires ([babashka.fs :as fs])
+           :task     (do (shell "dart compile js -O2 -o out/worker.js lib/cljd-out/hti/re-dash-inspector/worker.dart")
+
+                         ;; This location is necessary for bb run and
+                         ;; the devtools simulator.
+                         ;; It is also the file referenced as an asset in
+                         ;; pubspec.yaml, but ignored by the devtools IDE
+                         (fs/copy "out/worker.js" "../worker.js" {:replace-existing true}))
+           :depends [compile-cljd]}}}

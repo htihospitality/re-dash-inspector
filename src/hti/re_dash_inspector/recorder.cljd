@@ -14,7 +14,7 @@
   [{event-id :rd.inspector.event/id
     number   :rd.inspector.event/number
     diff     :rd.inspector.event/diff}]
-  (let [[db-before db-after] diff]
+  (let [[db-removed db-added] diff]
     (f/widget
       :watch [expanded? (atom false) :as expanded-state]
       (m/InkWell
@@ -28,20 +28,20 @@
                 (m/Flexible .fit m/FlexFit.tight)
                 (m/Text (or (pr-str event-id) "")))
               (m/SizedBox .width 10)
-              (if (some nil? [db-before db-after])
+              (if (nil? diff)
                 (f/widget
                   (m/Expanded .flex 4)
                   (m/LinearProgressIndicator
                     .minHeight 1))
                 [(f/widget
                    (m/Expanded .flex 2)
-                   (m/Text (pr-str db-before)
+                   (m/Text (pr-str (or db-removed {}))
                            .maxLines (if expanded? 10000 10)
                            .overflow m/TextOverflow.ellipsis))
                  (m/SizedBox .width 10)
                  (f/widget
                    (m/Expanded .flex 2)
-                   (m/Text (pr-str db-after)
+                   (m/Text (pr-str (or db-added {}))
                            .maxLines (if expanded? 10000 10)
                            .overflow m/TextOverflow.ellipsis))])]
              flatten)))))
@@ -95,10 +95,10 @@
          .onPressed #(rd/dispatch [:rd.inspector/apply-settings @form-state]))])))
 
 (defn- no-diff-filter
-  [{[db-before db-after] :rd.inspector.event/diff}
+  [{[db-removed db-added] :rd.inspector.event/diff}
    hide-events-with-no-diff?]
   (if hide-events-with-no-diff?
-    (or (seq db-before) (seq db-after))
+    (or (seq db-removed) (seq db-added))
     true))
 
 (def view
@@ -132,9 +132,10 @@
                                    ;; (eg. when the user selected a nested map value from the ui)
                                    (map (fn [event]
                                           (update event :rd.inspector.event/diff
-                                                  (fn [[db-before db-after]]
-                                                    [(get-in db-before selected-path)
-                                                     (get-in db-after selected-path)])))
+                                                  (fn [[db-removed db-added :as diff]]
+                                                    (when diff
+                                                      [(get-in db-removed selected-path)
+                                                       (get-in db-added selected-path)]))))
                                         events)
 
                                    events))
@@ -142,7 +143,6 @@
             items (atom (filter #(and (search/search-filter % search-text)
                                       (no-diff-filter % hide-events-with-no-diff?))
                                 items-narrowed))
-
 
             items-count (atom (count items))]
 

@@ -48,6 +48,5 @@
                                                :rd.inspector.event/number event-number
                                                :rd.inspector.event/diff   (->> (data/diff (sanitize db-before)
                                                                                           (sanitize db-after))
-                                                                               (take 2)
-                                                                               (map #(if (nil? %) {} %)))}
+                                                                               (take 2))}
                                               prn-str))))))))

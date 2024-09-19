@@ -47,7 +47,7 @@
            :path-controller   path-controller}
 
     :watch [;; Start the background web worker
-            _ (let [^web/Worker worker (web/Worker "/worker/out/worker.js")]
+            _ (let [^web/Worker worker (web/Worker "worker.js")]
 
                 (utils/setGlobal web/Worker worker)
 

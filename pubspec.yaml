@@ -26,4 +26,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - worker/out/worker.js
+    - worker.js

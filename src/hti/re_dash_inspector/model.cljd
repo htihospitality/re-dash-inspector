@@ -49,7 +49,7 @@
           (fn [app-events]
             (map (fn [{app-event-number :rd.inspector.event/number :as app-event}]
                    (if (= worker-event-number app-event-number)
-                     (merge app-event worker-event)
+                     worker-event
                      app-event))
                  app-events))))
 

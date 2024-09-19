@@ -16,7 +16,9 @@
          :depends  [compile]}
 
   build-copy {:doc     "Build and copy assets to extension folder"
-              :task    (shell "dart run devtools_extensions build_and_copy --source=. --dest=extension/devtools")
+              :requires ([babashka.fs :as fs])
+              :task    (do (shell "dart run devtools_extensions build_and_copy --source=. --dest=extension/devtools")
+                           (fs/copy "worker.js" "extension/devtools/build/worker.js" {:replace-existing true}))
               :depends [build]}
 
   validate {:doc  "Validate the extension build output"
