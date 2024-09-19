@@ -12,21 +12,21 @@
                           :or   {artifact "web"}
                           :as   args} (cli/parse-opts *command-line-args*)]
                      (shell (s/join " "
-                                    (flatten [(str "fvm flutter build " artifact)]))))
+                                    (flatten [(str "flutter build " artifact)]))))
          :depends  [compile]}
 
   build-copy {:doc     "Build and copy assets to extension folder"
-              :task    (shell "fvm dart run devtools_extensions build_and_copy --source=. --dest=extension/devtools")
+              :task    (shell "dart run devtools_extensions build_and_copy --source=. --dest=extension/devtools")
               :depends [build]}
 
   validate {:doc  "Validate the extension build output"
-            :task (shell "fvm dart run devtools_extensions validate --package=.")}
+            :task (shell "dart run devtools_extensions validate --package=.")}
 
   publish-dry-run {:doc  "Validate the pub package for publish"
-                   :task (shell "fvm dart pub publish --dry-run")}
+                   :task (shell "dart pub publish --dry-run")}
 
   publish {:doc  "Publish to pub.dev"
-           :task (shell "fvm dart pub publish")}
+           :task (shell "dart pub publish")}
 
   run {:doc      "Runs in simulator"
        :requires ([clojure.string :as s]
