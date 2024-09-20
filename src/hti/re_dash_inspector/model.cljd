@@ -77,6 +77,13 @@
   [db _]
   (update db :rd.inspector/recording? #(not %)))
 
+(defn- set-connection-state
+  [db [_ connection-state]]
+  (assoc db :rd.inspector/connected?
+         (if (= "connected" connection-state)
+           true
+           false)))
+
 (defn- toggle-selected-path-editable?
   [db _]
   (update db :rd.inspector/selected-path-editable? #(not %)))
@@ -112,6 +119,7 @@
 (defn- initialize-db
   [_ _]
   {:rd.inspector/recording? false
+   :rd.inspector/connected? false
    :rd.inspector/selected-path []
    :rd.inspector/selected-path-editable? false
    :rd.inspector/settings {:rd.inspector.setting/max-events 100
@@ -126,6 +134,7 @@
   (rd/reg-sub :rd.inspector/selected-path-editable? :-> :rd.inspector/selected-path-editable?)
   (rd/reg-sub :rd.inspector/search-text :-> :rd.inspector/search-text)
   (rd/reg-sub :rd.inspector/recording? :-> :rd.inspector/recording?)
+  (rd/reg-sub :rd.inspector/connected? :-> :rd.inspector/connected?)
   (rd/reg-sub :rd.inspector/events :-> :rd.inspector/events)
   (rd/reg-sub :rd.inspector/settings :-> :rd.inspector/settings)
 
@@ -144,6 +153,7 @@
   (rd/reg-event-db :rd.inspector/clear-events clear-events)
 
   (rd/reg-event-db :rd.inspector/toggle-recording toggle-recording)
+  (rd/reg-event-db :rd.inspector/set-connection-state set-connection-state)
 
   (rd/reg-event-fx :rd.inspector/handle-app-event handle-app-event)
   (rd/reg-event-db :rd.inspector/handle-worker-event handle-worker-event)

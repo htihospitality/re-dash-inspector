@@ -1,20 +1,52 @@
 (ns hti.re-dash-inspector.footer
   (:require ["package:flutter/material.dart" :as m]
+            ["package:devtools_app_shared/service.dart" :as service]
+            ["package:devtools_app_shared/utils.dart" :as utils]
             ["package:devtools_app_shared/ui.dart" :as ui]
-            [cljd.flutter :as f]))
+            [cljd.flutter :as f]
+            [hti.re-dash.core :as rd]))
+
+(def connection-button
+  (f/widget
+
+    :let [service-manager
+          ^service/ServiceManager
+          (get utils/globals service/ServiceManager)]
+
+    :watch [connected? (rd/subscribe [:rd.inspector/connected?])]
+
+    (ui/DevToolsToggleButton
+      .onPressed #(do (.callServiceExtensionOnMainIsolate
+                        service-manager
+                        "ext.re-dash-inspector.updateConnectionState"
+                        .args {"action" (if connected? "disconnect" "connect")})
+
+                      (rd/dispatch [:rd.inspector/set-connection-state
+                                    (if connected? "disconnectted" "connected")]))
+
+      .label (if connected? "Connected" "Disconnected")
+      .isSelected connected?
+      .message (if connected? "Disconnect from re-dash" "Connect to re-dash")
+      .icon (if connected? m/Icons.link m/Icons.link_off))))
 
 (def view
   (f/widget
     :context ctx
-    ui/RoundedOutlinedBorder
-    (m/Padding .padding (m/EdgeInsets.all 2))
     (m/Row
-      .mainAxisAlignment m/MainAxisAlignment.center
       .children
-      [(m/Text "Find re-dash useful? Consider supporting us via ")
-       (m/Text.rich
-         (ui/LinkTextSpan
-           .link (ui/Link
-                   .display "Github Sponsors"
-                   .url "https://github.com/sponsors/htihospitality")
-           .context ctx))])))
+      [(f/widget
+         m/Expanded
+         ui/RoundedOutlinedBorder
+         (m/Padding .padding (m/EdgeInsets.all 2))
+         (m/Row
+           .mainAxisAlignment m/MainAxisAlignment.center
+           .children
+           [(m/Text "Find re-dash useful? Consider supporting us via ")
+            (m/Text.rich
+              (ui/LinkTextSpan
+                .link (ui/Link
+                        .display "Github Sponsors"
+                        .url "https://github.com/sponsors/htihospitality")
+                .context ctx))]))
+       (m/SizedBox .width 5)
+       connection-button])))

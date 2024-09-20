@@ -61,12 +61,22 @@
 
             ;; Wait for the vm service to be available
             ^vm-service/VmService? vm-service
-            (-> service-manager .-onServiceAvailable await)
+            (-> service-manager .-onServiceAvailable)
 
             ;; Without setting this flag, every time the app
             ;; hot restarts, then the isolate is paused
             _ (when vm-service
                 (.setFlag vm-service "pause_isolates_on_start" "false"))
+
+            ;; Set inspector connection state in re-dash
+            _ (when vm-service
+                (.callServiceExtensionOnMainIsolate
+                  service-manager
+                  "ext.re-dash-inspector.updateConnectionState"
+                  .args {"action" "connect"})
+
+                (rd/dispatch [:rd.inspector/set-connection-state "connected"]))
+
 
             ;; Subscribe to post events from re-dash.
             ;; The reason we keep reference to and auto
