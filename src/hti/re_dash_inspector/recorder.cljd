@@ -146,6 +146,13 @@
 
             items-count (atom (count items))]
 
+    :managed [_timer (when recording?
+                      (async/new-periodic-timer
+                        (Duration .seconds 5)
+                        (fn [_]
+                          (rd/dispatch [:rd.inspector.event/dequeue]))))
+              :dispose async/cancel-timer]
+
     (m/Column
       .children
       [(m/SizedBox .height 5)

@@ -1,17 +1,49 @@
 (ns hti.re-dash-inspector.model
   (:require ["package:web/web.dart" :as web]
             ["package:vm_service/vm_service.dart" :as vm-service]
-            ["package:devtools_app_shared/utils.dart" :as utils]
+            ["dart:collection" :as coll]
             [hti.re-dash.core :as rd]
             [cljd.reader :as r]
             [clojure.string :as string]))
+
+(defonce ^:private ^coll/Queue events-queue
+  (coll/Queue))
+
+(defn find-available-worker
+  [db]
+  (->> (:rd.inspector/workers db)
+       (filter (fn [[_worker-id {:keys [busy?]}]]
+                 (not busy?)))
+       first))
+
+(defn dequeue-event
+  [{:keys [db]} _]
+
+  (when-let [[worker-id {:keys [worker]}]
+             (find-available-worker db)]
+
+    (when (.-isNotEmpty events-queue)
+
+      {:db (update-in db [:rd.inspector/workers worker-id] assoc :busy? true)
+
+       :rd.inspector.fx/delegate-to-worker
+       {:worker worker
+        :data   (.removeLast events-queue)}})))
+
+(defn- enqueue
+  "Adds event to queue and purge events exceeding queue max size"
+  [{data :data
+    {max-events :rd.inspector.setting/max-events} :settings}]
+  (.add events-queue data)
+  (while (> (.-length events-queue) max-events)
+    (.removeFirst events-queue)))
 
 (defn- handle-app-event
   [{{recording? :rd.inspector/recording?
      db-before  :rd.inspector/db
      app-events :rd.inspector/events
 
-     {max-events :rd.inspector.setting/max-events}
+     {max-events :rd.inspector.setting/max-events :as settings}
      :rd.inspector/settings
 
      :as db} :db}
@@ -36,28 +68,37 @@
         {:db                     (assoc db
                                         :rd.inspector/db app-db
                                         :rd.inspector/events app-events')
-         :rd.inspector/calc-diff app-event})
+
+         :rd.inspector.fx/enqueue {:data app-event :settings settings}})
 
       {:db (assoc db :rd.inspector/db app-db)})))
 
 
 (defn- handle-worker-event
-  [db [_ {worker-event-number :rd.inspector.event/number
-          :as worker-event}]]
+  [{{current-events :rd.inspector/events
+     :as            db}
+    :db}
 
-  (update db :rd.inspector/events
-          (fn [app-events]
-            (map (fn [{app-event-number :rd.inspector.event/number :as app-event}]
-                   (if (= worker-event-number app-event-number)
-                     worker-event
-                     app-event))
-                 app-events))))
+   [_ {worker-id :worker-id
+       {worker-event-number :rd.inspector.event/number
+        :as                 worker-event}
+       :data}]]
 
-(defn- calc-diff
-  [event-dbs]
+  (let [apply-changes?
+        (>= worker-event-number (-> current-events last :rd.inspector.event/number))]
 
-  (let [^web/Worker worker (get utils/globals web/Worker)]
-    (.postMessage worker (prn-str event-dbs))))
+    {:db (-> (update db :rd.inspector/events
+                     (fn [app-events]
+                       (if apply-changes?
+                         (map (fn [{app-event-number :rd.inspector.event/number :as app-event}]
+                                (if (= worker-event-number app-event-number)
+                                  worker-event
+                                  app-event))
+                              app-events)
+
+                         app-events)))
+             (update-in [:rd.inspector/workers worker-id] assoc :busy? false))
+     :fx [(when apply-changes? [:dispatch [:rd.inspector.event/dequeue]])]}))
 
 (defn- set-search-text
   [db [_ search-text]]
@@ -104,7 +145,7 @@
                  :rd.inspector/selected-path selected-path'
                  :rd.inspector/selected-path-error? false)
           (assoc db :rd.inspector/selected-path-error? true))))
-    (catch dynamic e
+    (catch dynamic _e
       (assoc db :rd.inspector/selected-path-error? true))))
 
 (defn- update-selected-path-coll
@@ -122,8 +163,34 @@
    :rd.inspector/connected? false
    :rd.inspector/selected-path []
    :rd.inspector/selected-path-editable? false
-   :rd.inspector/settings {:rd.inspector.setting/max-events 100
+   :rd.inspector/settings {:rd.inspector.setting/max-events 50
                            :rd.inspector.setting/hide-events-with-no-diff? false}})
+
+(defn register-workers-event
+  [{:keys [db]} [_ {:keys [worker-count] :as args}]]
+  (let [workers (->> (for [id (range worker-count)]
+                       [id {:worker-id id
+                            :busy?     false
+                            :worker    (web/Worker "worker.js")}])
+                     (into {}))]
+
+    {:db                               (assoc db :rd.inspector/workers workers)
+     :rd.inspector.fx/register-workers (assoc args :workers workers)}))
+
+(defn register-workers-fx
+  [{:keys [parent workers]}]
+  (run! (fn [[worker-id {:keys [worker]}]]
+          (.autoDisposeStreamSubscription
+            parent
+            (-> worker .-onMessage
+                (.listen #(rd/dispatch [:rd.inspector/handle-worker-event
+                                        {:worker-id worker-id
+                                         :data      (some-> % .-data r/read-string)}])))))
+        workers))
+
+(defn delegate-to-worker-fx
+  [{:keys [data worker]}]
+  (.postMessage worker (prn-str data)))
 
 (defn register!
   []
@@ -156,5 +223,12 @@
   (rd/reg-event-db :rd.inspector/set-connection-state set-connection-state)
 
   (rd/reg-event-fx :rd.inspector/handle-app-event handle-app-event)
-  (rd/reg-event-db :rd.inspector/handle-worker-event handle-worker-event)
-  (rd/reg-fx :rd.inspector/calc-diff calc-diff))
+  (rd/reg-event-fx :rd.inspector/handle-worker-event handle-worker-event)
+
+  (rd/reg-event-fx :rd.inspector.event/register-workers register-workers-event)
+  (rd/reg-fx :rd.inspector.fx/register-workers register-workers-fx)
+
+  (rd/reg-fx :rd.inspector.fx/delegate-to-worker delegate-to-worker-fx)
+
+  (rd/reg-event-fx :rd.inspector.event/dequeue dequeue-event)
+  (rd/reg-fx :rd.inspector.fx/enqueue enqueue))

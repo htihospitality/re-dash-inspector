@@ -10,3 +10,13 @@
     occur synchronously, while a widget is being built."
   [f]
   (async/Timer.run f))
+
+(defn ^async/Timer new-periodic-timer
+  "Creates a new timer instance."
+  [^Duration duration callback]
+  (async/Timer.periodic duration callback))
+
+(defn cancel-timer
+  "Cancels a timer safely."
+  [^async/Timer? timer]
+  (when timer (.cancel timer)))
