@@ -2,6 +2,7 @@
   (:require ["package:web/web.dart" :as web]
             ["package:vm_service/vm_service.dart" :as vm-service]
             ["dart:collection" :as coll]
+            ["package:devtools_app_shared/utils.dart" :as utils]
             [hti.re-dash.core :as rd]
             [cljd.reader :as r]
             [clojure.string :as string]))
@@ -177,9 +178,10 @@
     {:db                               (assoc db :rd.inspector/workers workers)
      :rd.inspector.fx/register-workers (assoc args :workers workers)}))
 
+
 (defn register-workers-fx
-  [{:keys [parent workers]}]
-  (run! (fn [[worker-id {:keys [worker]}]]
+  [{:keys [^utils/AutoDisposeMixin parent workers]}]
+  (run! (fn [[worker-id {:keys [^web/Worker worker]}]]
           (.autoDisposeStreamSubscription
             parent
             (-> worker .-onMessage
@@ -189,7 +191,7 @@
         workers))
 
 (defn delegate-to-worker-fx
-  [{:keys [data worker]}]
+  [{:keys [data ^web/Worker worker]}]
   (.postMessage worker (prn-str data)))
 
 (defn register!

@@ -37,7 +37,7 @@
 
   (let [worker (.-instance html/DedicatedWorkerGlobalScope)]
     (-> worker .-onMessage
-        (.listen (fn [m]
+        (.listen (fn [^html/MessageEvent m]
                    (let [{event-id     :rd.inspector.event/id
                           event-number :rd.inspector.event/number
                           db-before    :rd.inspector.event/db-before

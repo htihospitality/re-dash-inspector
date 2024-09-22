@@ -5,7 +5,6 @@
    ["package:devtools_extensions/devtools_extensions.dart" :as ext]
    ["package:flutter/material.dart" :as m]
    ["package:vm_service/vm_service.dart" :as vm-service]
-   ["package:web/web.dart" :as web]
    [cljd.flutter :as f]
    [hti.re-dash-inspector.breadcrumbs :as breadcrumbs]
    [hti.re-dash-inspector.footer :as footer]
@@ -13,8 +12,7 @@
    [hti.re-dash-inspector.recorder :as recorder]
    [hti.re-dash-inspector.search :as search]
    [hti.re-dash-inspector.model :as model]
-   [hti.re-dash.core :as rd]
-   [cljd.reader :as r]))
+   [hti.re-dash.core :as rd]))
 
 (defn- app-event?
   [{:flds [extensionKind timestamp] :as ^vm-service/Event _}
