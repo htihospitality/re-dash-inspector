@@ -95,10 +95,10 @@
          .onPressed #(rd/dispatch [:rd.inspector/apply-settings @form-state]))])))
 
 (defn- no-diff-filter
-  [{[db-removed db-added] :rd.inspector.event/diff}
+  [{[db-removed db-added :as diff] :rd.inspector.event/diff}
    hide-events-with-no-diff?]
   (if hide-events-with-no-diff?
-    (or (seq db-removed) (seq db-added))
+    (or (nil? diff) (seq db-removed) (seq db-added))
     true))
 
 (def view
