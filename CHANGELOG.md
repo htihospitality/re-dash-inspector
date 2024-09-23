@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.6
+### Changes
+- Added the events recorder
+
 ## 0.0.5
 ### Changes
 - Fixed auto disposing of event listeners
