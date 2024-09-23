@@ -60,4 +60,3 @@ test/cljd-out/
 /worker/.envrc
 /worker/lib/cljd-out/
 /worker/out/
-/worker.js
