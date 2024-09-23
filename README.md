@@ -72,6 +72,11 @@ The DevTools extension is updated with a new copy of the app-db contents every t
 
 Keep this in mind while developing, as it might add some overhead to your application during each re-dash event loop. Importantly this will not impact your compiled application at all, only during development mode - if even noticeable at all.
 
+The `debug` interceptor will only attempt to send the serialized database to DevTools if
+
+- the app is running in debug mode
+- the inspector has an active connection to re-dash
+
 ## Extension
 
-When the Recorder is started, the app-db contents will be diff'ed using ClojureDart's `clojure.data/diff` implementation. This work is done in the DevTools extension process, not the app's process, so the app will not incur this performance overhead, but the DevTools process will. This work is offloaded onto 4 [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) running in the background, but depending on the size of the app-db being diff'ed, you might notice some UI performance degradation in this re-dash-inspector as the results of these diff's are being rendered on screen.
+When the Recorder is started, each event's app-db contents will be diff'ed using ClojureDart's `clojure.data/diff` implementation. This work is done in the DevTools extension process, not the app's process, so the app will not incur this performance overhead, but the DevTools process will. This work is offloaded onto 4 [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) running in the background, but depending on the size of the app-db being diff'ed, you might notice some UI performance degradation in this re-dash-inspector UI as the results of these diff's are being rendered on screen.
