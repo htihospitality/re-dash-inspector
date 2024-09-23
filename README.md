@@ -80,3 +80,7 @@ The `debug` interceptor will only attempt to send the serialized database to Dev
 ## Extension
 
 When the Recorder is started, each event's app-db contents will be diff'ed using ClojureDart's `clojure.data/diff` implementation. This work is done in the DevTools extension process, not the app's process, so the app will not incur this performance overhead, but the DevTools process will. This work is offloaded onto 4 [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) running in the background, but depending on the size of the app-db being diff'ed, you might notice some UI performance degradation in this re-dash-inspector UI as the results of these diff's are being rendered on screen.
+
+# Privacy
+
+The [debug](https://github.com/htihospitality/re-dash/blob/main/doc/02-debugging.md) interceptor sends the contents of the app-db to the locally running [Flutter DevTools](https://docs.flutter.dev/tools/devtools) using the [`postEvent`](https://api.flutter.dev/flutter/dart-developer/postEvent.html) function call. At no point does the data leave the local machine and all processing is done locally in the DevTools process.
