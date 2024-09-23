@@ -130,7 +130,7 @@
          .tabs
          [(m/Tab .text "Inspector")
           (m/Tab .text "Recorder")])
-       (m/SizedBox .height 5)
+       (m/SizedBox .height 10)
        search/view
        (m/SizedBox .height 5)
        breadcrumbs/view

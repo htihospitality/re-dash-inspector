@@ -25,7 +25,7 @@
                         m/WidgetStateMouseCursor.clickable
                         m/SystemMouseCursors.basic))
        (m/Text (or (pr-str v) "")
-               .maxLines 100
+               .maxLines 10
                .overflow m/TextOverflow.ellipsis))]))
 
 (defn- seq-row

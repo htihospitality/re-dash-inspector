@@ -49,29 +49,29 @@
     :watch [selected-path (rd/subscribe [:rd.inspector/selected-path])]
 
     (f/widget
-      (m/Row
+      (m/Wrap
         .children
-        [(m/IconButton
-           .icon (m/Icon (m/Icons.edit) .size ui/tableIconSize)
-           .onPressed #(rd/dispatch [:rd.inspector/toggle-selected-path-editable?]))
-         (m/Wrap
-           .children
-           (concat
-             [(m/SizedBox .width 3)
+        (concat
+          [(f/widget
+             (m/Padding .padding (m/EdgeInsets.only .top 3))
+             (m/InkWell
+               .onTap #(rd/dispatch [:rd.inspector/toggle-selected-path-editable?]))
+             (m/Icon (m/Icons.edit) .size ui/tableIconSize))
+           (m/SizedBox .width 5)
+           (f/widget
+             (m/InkWell
+               .onTap #(rd/dispatch [:rd.inspector/clear-selected-path]))
+             (m/Text "/ root"))]
+          (map-indexed
+            (fn [idx crumb]
               (f/widget
                 (m/InkWell
-                  .onTap #(rd/dispatch [:rd.inspector/clear-selected-path]))
-                (m/Text "/ root"))]
-             (map-indexed
-               (fn [idx crumb]
-                 (f/widget
-                   (m/InkWell
-                     .onTap #(rd/dispatch [:rd.inspector/update-selected-path idx]))
-                   (m/Container
-                     .constraints (m/BoxConstraints .maxWidth 1000))
-                   (m/Text (str " / " (pr-str crumb))
-                           .overflow m/TextOverflow.ellipsis)))
-               selected-path)))]))))
+                  .onTap #(rd/dispatch [:rd.inspector/update-selected-path idx]))
+                (m/Container
+                  .constraints (m/BoxConstraints .maxWidth 1000))
+                (m/Text (str " / " (pr-str crumb))
+                        .overflow m/TextOverflow.ellipsis)))
+            selected-path))))))
 
 (def view
   "When selecting an item from the table,
