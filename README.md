@@ -25,16 +25,21 @@ A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-
 ## Inspector
 
 ![inspector](doc/images/inspector.png)
-![inspector-nested](doc/images/inspector-nested.png)
 
 ## Recorder
 
-![recorder](doc/images/recorder.png)
-![recorder-settings](doc/images/recorder-settings.png)
+![recorder](doc/images/recorder.png) 
 
-# Demo
+# Demo Videos
 
-[re-dash-inspector.webm](https://github.com/user-attachments/assets/e6864f98-e97f-4d9a-8624-ac06c71c9cef)
+## Inspector
+
+[Inspector.webm](https://github.com/user-attachments/assets/35d1258a-c82d-4f36-ae60-725c27892afa)
+
+## Recorder
+
+[Recorder.webm](https://github.com/user-attachments/assets/eca39e8a-4985-41b0-ad8c-9e99b13a9196)
+
 
 # Prerequisites
 
