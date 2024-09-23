@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.7
+### Changes
+- Fixed release build
+
 ## 0.0.6
 ### Changes
 - Added the events recorder
