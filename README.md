@@ -24,11 +24,11 @@ A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-
 
 ## Inspector
 
-![inspector](doc/images/inspector.png)
+![inspector](https://raw.githubusercontent.com/htihospitality/re-dash-inspector/main/doc/images/inspector.png)
 
 ## Recorder
 
-![recorder](doc/images/recorder.png)
+![recorder](https://raw.githubusercontent.com/htihospitality/re-dash-inspector/main/doc/images/recorder.png)
 
 # Demo Videos
 
