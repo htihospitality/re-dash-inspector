@@ -52,7 +52,7 @@ Add `re_dash_inspector` to your `dev_dependencies` in `pubspec.yaml`
 
 ```yaml
 dev_dependencies:
-  re_dash_inspector: ^0.0.7
+  re_dash_inspector: ^0.0.8
 ```
 
 then register the `debug` re-dash interceptor targeting dev-tools either in selected event handlers or globally in `main` like
@@ -62,7 +62,7 @@ then register the `debug` re-dash interceptor targeting dev-tools either in sele
     (rd/debug {:target :target/dev-tools}))
 ```
 
-See [Debugging](https://github.com/htihospitality/re-dash/blob/main/doc/02-debugging.md) for more options using the `debug` interceptor.
+See [Debugging](https://github.com/htihospitality/re-dash/blob/main/doc/02-debugging.md#the-debug-interceptor) for more options using the `debug` interceptor.
 
 # Performance
 

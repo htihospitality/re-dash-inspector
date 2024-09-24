@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.8
+### Changes
+- Fixed readme images on pub.dev
+
 ## 0.0.7
 ### Changes
 - Fixed release build
