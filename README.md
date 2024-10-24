@@ -52,7 +52,7 @@ Add `re_dash_inspector` to your `dev_dependencies` in `pubspec.yaml`
 
 ```yaml
 dev_dependencies:
-  re_dash_inspector: ^0.0.8
+  re_dash_inspector: ^0.1.0-dev.0
 ```
 
 then register the `debug` re-dash interceptor targeting dev-tools either in selected event handlers or globally in `main` like

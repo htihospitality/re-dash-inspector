@@ -3,6 +3,7 @@
             ["package:vm_service/vm_service.dart" :as vm-service]
             ["dart:collection" :as coll]
             ["package:devtools_app_shared/utils.dart" :as utils]
+            ["worker.dart" :as worker]
             [hti.re-dash.core :as rd]
             [cljd.reader :as r]
             [clojure.string :as string]))
@@ -172,7 +173,7 @@
   (let [workers (->> (for [id (range worker-count)]
                        [id {:worker-id id
                             :busy?     false
-                            :worker    (web/Worker "worker.js")}])
+                            :worker    (worker/createWorker)}])
                      (into {}))]
 
     {:db                               (assoc db :rd.inspector/workers workers)

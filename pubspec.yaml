@@ -1,6 +1,6 @@
 name: re_dash_inspector
 description: A Flutter DevTools extension for re-dash
-version: 0.0.8
+version: 0.1.0-dev.0
 
 repository: https://github.com/htihospitality/re-dash-inspector
 
@@ -11,8 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
-  devtools_extensions: ^0.2.2
-  devtools_app_shared: ^0.2.2
+  devtools_extensions: ^0.3.0-dev.0
+  devtools_app_shared: ^0.2.3
 
 dev_dependencies:
   lints: ^2.0.0
