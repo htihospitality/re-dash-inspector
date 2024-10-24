@@ -43,7 +43,7 @@ A Flutter DevTools extension for [re-dash](https://github.com/htihospitality/re-
 
 # Prerequisites
 
-- [re-dash](https://github.com/htihospitality/re-dash) v1.1.0 minimum
+- [re-dash](https://github.com/htihospitality/re-dash) v1.1.2 minimum
 - The contents of the app db need to be serializable to/from EDN using ClojureDart's `pr-str` and `cljd.reader/read-string`
 
 # Usage
