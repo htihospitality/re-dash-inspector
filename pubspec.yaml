@@ -13,6 +13,7 @@ dependencies:
 
   devtools_extensions: ^0.3.0-dev.0
   devtools_app_shared: ^0.2.3
+  web: ^1.1.0
 
 dev_dependencies:
   lints: ^2.0.0
