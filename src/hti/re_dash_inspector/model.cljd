@@ -1,5 +1,6 @@
 (ns hti.re-dash-inspector.model
   (:require ["package:web/web.dart" :as web]
+            ["dart:js_interop" :as js]
             ["package:vm_service/vm_service.dart" :as vm-service]
             ["dart:collection" :as coll]
             ["package:devtools_app_shared/utils.dart" :as utils]
@@ -172,7 +173,7 @@
   (let [workers (->> (for [id (range worker-count)]
                        [id {:worker-id id
                             :busy?     false
-                            :worker    (web/Worker "worker.js")}])
+                            :worker    (-> "worker.js" js/StringToJSString .-toJS web/Worker)}])
                      (into {}))]
 
     {:db                               (assoc db :rd.inspector/workers workers)
