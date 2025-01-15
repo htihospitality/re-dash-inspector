@@ -14,7 +14,6 @@ dependencies:
   devtools_extensions: ^0.3.0
   devtools_app_shared: ^0.3.0
   web: ^1.1.0
-  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   lints: ^2.0.0
