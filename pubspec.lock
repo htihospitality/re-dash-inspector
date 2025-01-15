@@ -109,26 +109,26 @@ packages:
     dependency: "direct main"
     description:
       name: devtools_app_shared
-      sha256: "1000ebdee15f9bcb2eff4a6bf0437a084e9702d7a33ad38014ee2d7ef68b6781"
+      sha256: df6c3f8548219ee2bfa442968f012ea3148e41122fc485c5ebd043d98ff97023
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.3"
+    version: "0.3.0"
   devtools_extensions:
     dependency: "direct main"
     description:
       name: devtools_extensions
-      sha256: "59635fdf23014b76362a4417e300ab600488b3278207472251d7b9d8858439e7"
+      sha256: afa8e01bed815f18d61e73ade0b5720b015495a602c037067cd6f43d7a1cdf07
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.0-dev.0"
+    version: "0.3.0"
   devtools_shared:
     dependency: transitive
     description:
       name: devtools_shared
-      sha256: "72369878105eccd563547afbad97407a2431b96bd4c04a1d6da75cb068437f50"
+      sha256: fa71f07006dfdf3f226ec76db95a4bad156820c081452cc99d18a4f291001bee
       url: "https://pub.dev"
     source: hosted
-    version: "10.0.2"
+    version: "11.2.0"
   dtd:
     dependency: transitive
     description:
@@ -141,10 +141,10 @@ packages:
     dependency: transitive
     description:
       name: extension_discovery
-      sha256: "20735622d0763865f9d94c3ecdce4441174530870760253e9d364fb4f3da8688"
+      sha256: de1fce715ab013cdfb00befc3bdf0914bea5e409c3a567b7f8f144bc061611a7
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.0"
+    version: "2.1.0"
   file:
     dependency: transitive
     description:
@@ -633,5 +633,5 @@ packages:
     source: hosted
     version: "2.2.1"
 sdks:
-  dart: ">=3.6.0-149.3.beta <4.0.0"
-  flutter: ">=3.25.0-0.1.pre"
+  dart: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.1"

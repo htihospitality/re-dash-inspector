@@ -1,11 +1,11 @@
 name: re_dash_inspector_worker
 description: A Web Worker for the Flutter DevTools extension for re-dash
-version: 0.1.0-dev.0
+version: 0.1.0
 
 repository: https://github.com/htihospitality/re-dash-inspector
 
 environment:
-  sdk: '>=3.1.5 <4.0.0'
+  sdk: '>=3.6.0 <4.0.0'
 
 dependencies:
 
