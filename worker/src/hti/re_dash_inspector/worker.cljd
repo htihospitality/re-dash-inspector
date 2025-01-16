@@ -1,5 +1,6 @@
 (ns hti.re-dash-inspector.worker
-  (:require ["dart:html" :as html]
+  (:require ["package:web/web.dart" :as web]
+            ["worker.dart" :as worker]
             [clojure.data :as data]
             [cljd.reader :as r]
             [clojure.walk :as w]))
@@ -31,22 +32,25 @@
   []
 
   ;; TODO
-  ;; Ideally we'd want to use the Web package here instead of dart:html
-  ;; but as of writing there's no way to get a reference to the global scope
-  ;; see: https://stackoverflow.com/questions/78566237/accessing-workerglobalscope-instance-in-web-worker-using-packageweb
+  ;; Doesn't work yet because the listener function (callback) being passed
+  ;; in is not a subtype of JavaScriptFunction and not sure how to convert?
 
-  (let [worker (.-instance html/DedicatedWorkerGlobalScope)]
-    (-> worker .-onMessage
-        (.listen (fn [^html/MessageEvent m]
-                   (let [{event-id     :rd.inspector.event/id
-                          event-number :rd.inspector.event/number
-                          db-before    :rd.inspector.event/db-before
-                          db-after     :rd.inspector.event/db-after}
-                         (some-> m .-data r/read-string)]
+  ;; In native dart we're able to reference the DedicatedWorkerGlobalScope, that's why
+  ;; we divert to the `worker` dart file.
+  ;; See: https://github.com/dart-lang/web/issues/251
 
-                     (.postMessage worker (-> {:rd.inspector.event/id     event-id
-                                               :rd.inspector.event/number event-number
-                                               :rd.inspector.event/diff   (->> (data/diff (sanitize db-before)
-                                                                                          (sanitize db-after))
-                                                                               (take 2))}
-                                              prn-str))))))))
+  (let [worker (worker/getWorkerGlobalScope)]
+    (worker/listen
+     (fn [m]
+       (let [{event-id     :rd.inspector.event/id
+              event-number :rd.inspector.event/number
+              db-before    :rd.inspector.event/db-before
+              db-after     :rd.inspector.event/db-after}
+             (some-> m .-data r/read-string)]
+
+         (.postMessage worker (-> {:rd.inspector.event/id     event-id
+                                   :rd.inspector.event/number event-number
+                                   :rd.inspector.event/diff   (->> (data/diff (sanitize db-before)
+                                                                              (sanitize db-after))
+                                                                   (take 2))}
+                                  prn-str)))))))

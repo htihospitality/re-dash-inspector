@@ -5,9 +5,10 @@ version: 0.1.0
 repository: https://github.com/htihospitality/re-dash-inspector
 
 environment:
-  sdk: '>=3.6.0 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 dependencies:
+  web: ^1.1.0
 
 dev_dependencies:
   lints: ^2.0.0
