@@ -1,0 +1,7 @@
+# Misc
+out/
+
+# Clojure
+.lsp/
+.cp-cache/
+.clj-kondo/

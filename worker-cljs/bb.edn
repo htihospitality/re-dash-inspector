@@ -1,0 +1,13 @@
+{:tasks
+ {compile {:doc "Compile to JS"
+           :requires ([babashka.fs :as fs]
+                      [clojure.string :as str])
+           :task (do 
+                   
+                   (->> ["clj -M -m cljs.main"
+                         "--optimizations advanced"
+                         "-c hti.re-dash-inspector.worker"]
+                        (str/join " ")
+                        shell)
+                   
+                   (fs/copy "out/main.js" "../worker.js" {:replace-existing true}))}}}
