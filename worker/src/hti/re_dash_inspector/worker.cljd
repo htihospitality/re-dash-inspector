@@ -1,11 +1,12 @@
 (ns hti.re-dash-inspector.worker
   (:require ["package:web/web.dart" :as web]
+            ["dart:js_interop" :as js_interop]
             ["worker.dart" :as worker]
             [clojure.data :as data]
             [cljd.reader :as r]
             [clojure.walk :as w]))
 
-(defn sanitize
+(defn- sanitize
   [m]
   (w/postwalk
     (fn [element]
@@ -27,30 +28,44 @@
         element))
     m))
 
+(defn- js-fn 
+  [^#/(web/MessageEvent -> void) f]
+  (let [f f]
+    (-> f js_interop/FunctionToJSExportedDartFunction .-toJS)))
+
+(defn- js-str
+  [s]
+  (-> s js_interop/StringToJSString .-toJS))
 
 (defn main
   []
 
-  ;; TODO
-  ;; Doesn't work yet because the listener function (callback) being passed
-  ;; in is not a subtype of JavaScriptFunction and not sure how to convert?
-
   ;; In native dart we're able to reference the DedicatedWorkerGlobalScope, that's why
   ;; we divert to the `worker` dart file.
   ;; See: https://github.com/dart-lang/web/issues/251
+  
+  (-> (fn [^web/MessageEvent m]
 
-  (let [worker (worker/getWorkerGlobalScope)]
-    (worker/listen
-     (fn [m]
-       (let [{event-id     :rd.inspector.event/id
-              event-number :rd.inspector.event/number
-              db-before    :rd.inspector.event/db-before
-              db-after     :rd.inspector.event/db-after}
-             (some-> m .-data r/read-string)]
+        ;; Without this pr-str, we get an error when accessing the data property of the MessageEvent:
+        ;; TypeError: m$1.get$data is not a function
+        ;; ¯\_(ツ)_/¯
+        (pr-str m)
 
-         (.postMessage worker (-> {:rd.inspector.event/id     event-id
-                                   :rd.inspector.event/number event-number
-                                   :rd.inspector.event/diff   (->> (data/diff (sanitize db-before)
-                                                                              (sanitize db-after))
-                                                                   (take 2))}
-                                  prn-str)))))))
+        (let [data (.-data ^web/MessageEvent m)
+
+              {event-id     :rd.inspector.event/id
+               event-number :rd.inspector.event/number
+               db-before    :rd.inspector.event/db-before
+               db-after     :rd.inspector.event/db-after}
+              (some-> data r/read-string)]
+
+          (.postMessage ^web/DedicatedWorkerGlobalScope (worker/getWorkerGlobalScope)
+                        (-> {:rd.inspector.event/id     event-id
+                             :rd.inspector.event/number event-number
+                             :rd.inspector.event/diff   (->> (data/diff (sanitize db-before)
+                                                                        (sanitize db-after))
+                                                             (take 2))}
+                            prn-str
+                            js-str))))
+      js-fn
+      worker/listen))
