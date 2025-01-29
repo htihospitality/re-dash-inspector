@@ -2,6 +2,7 @@
 
 ## 0.1.0
 ### Changes
+- Migrated from dart:html to the new [web](https://pub.dev/packages/web) package 
 - Bumped devtools_extensions to 0.3.0
 - Bumped devtools_app_shared to 0.3.0
 
