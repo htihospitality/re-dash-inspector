@@ -49,3 +49,15 @@ dev_dependencies:
 ```
 
 Start your app, open Flutter DevTools, and you should see a tab for the re_dash extension.
+
+## Worker
+
+The recorder makes use of web workers for diffing data structures. As web workers run in their own process seperate from the main app, it needs to be compiled seperately as well.
+
+If changes were made to `worker.cljd` then run the worker's compile step from the `./worker` folder first:
+
+```bash
+bb compile
+```
+
+and afterward run the main app's `bb run` or `bb build-copy` etc.

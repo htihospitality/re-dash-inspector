@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.1.0
+### Changes
+- Migrated from dart:html to the new [web](https://pub.dev/packages/web) package 
+- Bumped devtools_extensions to 0.3.0
+- Bumped devtools_app_shared to 0.3.0
+
+## 0.1.0-dev.0
+### Changes
+- Bumped devtools_extensions to 0.3.0-dev.0
+- Bumped devtools_app_shared to 0.2.3
+
 ## 0.0.8
 ### Changes
 - Fixed readme images on pub.dev
