@@ -193,7 +193,7 @@
 
 (defn delegate-to-worker-fx
   [{:keys [data ^web/Worker worker]}]
-  (.postMessage worker (prn-str data)))
+  (.postMessage worker (pr-str data)))
 
 (defn register!
   []
